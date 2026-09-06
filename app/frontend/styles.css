@@ -1,0 +1,554 @@
+:root{
+  /* Фирменная пара «Ремтехника»: жёлтый знак на чёрном. Жёлтый — только акцент
+     (кнопки, активный выбор, тонкие линии), поля и фон остаются чёрными. */
+  --rt-yellow:#ffc20e; --rt-yellow-d:#e0a800; --rt-black:#0d0d0f;
+  --ink:#f2f2f4; --bg:#0d0d0f; --accent:#ffc20e;
+  /* Высоты фиксированных полос. Экраны считают по ним свои отступы, поэтому
+     достаточно поменять здесь — контент нигде не заедет под полосу. */
+  --bar-top:80px; --bar-bottom:100px;
+  --gap-v:2.5vh;   /* вертикальный ритм: на низких экранах сжимается */
+  /* Безопасные зоны экрана — только для размера кадра камеры. В полосах и
+     отступах экранов env() стоит напрямую: часть версий Safari не разворачивает
+     env() внутри custom property, а там от этого зависит, дотянется ли полоса
+     до низа. Для камеры ошибка некритична — кадр окажется чуть крупнее. */
+  --safe-top:env(safe-area-inset-top, 0px);
+  --safe-bottom:env(safe-area-inset-bottom, 0px);
+}
+/* Ноутбуки и iPad в ландшафте: по высоте места мало, полосы ужимаем */
+@media (max-height:900px){
+  :root{ --bar-top:64px; --bar-bottom:84px; --gap-v:1.6vh; }
+}
+@media (max-height:760px){
+  :root{ --bar-top:56px; --bar-bottom:70px; --gap-v:1vh; }
+}
+/* Телефон: экран узкий и высокий, полосы съедали столько, что контент не
+   помещался и кнопки уходили под нижнюю полосу. Полосы делаем компактными. */
+@media (max-width:640px){
+  :root{ --bar-top:48px; --bar-bottom:62px; --gap-v:1vh; }
+  .global-partners-label{display:none;}   /* подпись съедает строку, логотипы говорят сами */
+  .global-partners{gap:0; padding-top:6px;}
+  .global-partners-logos img{padding:0 clamp(6px,2vw,14px);}
+  .topbar-logos{display:none !important;} /* в узкий топбар они всё равно не влезают */
+}
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+/* Зону под индикатором внизу закрашивает html, поэтому цвет здесь должен
+   совпадать с нижней полосой партнёров (rgb(13,13,15)), а не с фоном страницы:
+   с болотным #071d24 под полосой оставался заметный чужеродный кант. */
+html{background:#0d0d0f;}
+html,body{margin:0;height:100%;}
+body{
+  font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; color:var(--ink);
+  background:radial-gradient(circle at 50% -8%, #1c1c20 0%, #121214 55%, #0a0a0c 100%);
+  overflow:hidden;
+  user-select:none; -webkit-user-select:none;
+  -webkit-text-size-adjust:100%;   /* Safari иначе сам раздувает текст */
+  touch-action:manipulation;       /* без задержки и зума по двойному тапу */
+}
+#app{position:fixed; inset:0;}
+.screen{
+  position:absolute; inset:0; display:none; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center;
+  padding:calc(var(--bar-top) + env(safe-area-inset-top, 0px) + var(--gap-v))
+          max(5vw, env(safe-area-inset-left, 0px))
+          calc(var(--bar-bottom) + env(safe-area-inset-bottom, 0px) + var(--gap-v))
+          max(5vw, env(safe-area-inset-right, 0px));
+  animation:fade .45s ease; z-index:2;
+  /* Если контент всё же выше экрана — даём прокрутить, а не срезаем кнопки.
+     С обычным center верх уезжает за край и становится недоступен, поэтому
+     safe center: он прижимает к началу вместо обрезки. */
+  overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+}
+@supports (justify-content:safe center){
+  .screen{ justify-content:safe center; }
+}
+.screen.active{display:flex;}
+
+/* Зацикленное видео-фон */
+.site-bg-video{position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;
+  filter:blur(4px) brightness(.9) saturate(.9); transform:scale(1.04);}
+.site-bg-overlay{position:fixed; inset:0; z-index:1;
+  background:linear-gradient(180deg, rgba(10,10,12,.62) 0%, rgba(10,10,12,.45) 45%, rgba(10,10,12,.85) 100%);}
+/* Фирменная фактура: диагональ под 45° — тот же скос, что у углов знака «rt».
+   Держим на грани заметности (2%), иначе рябит под фото и текстом. */
+.site-bg-overlay::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(135deg,
+    rgba(255,194,14,.022) 0 2px, transparent 2px 26px);
+}
+@keyframes fade{from{opacity:0; transform:translateY(12px);}to{opacity:1; transform:none;}}
+
+/* Заголовки считаем и от ширины, и от высоты — на низком экране крупный кегль
+   съедал место, которого не хватало кнопкам. */
+h1{font-size:min(11vw,9vh,84px); margin:.08em 0 0; color:#fff;
+  letter-spacing:-.02em; line-height:1.02; font-weight:800;}
+h1 span{color:var(--rt-yellow);}
+/* Кавычки белые, как и текст: приглушённые читались как выцветшие.
+   Вес чуть легче основного — так они не спорят с «деле», но и не выглядят
+   случайно потерявшими цвет. */
+h1 .q{color:#fff; font-weight:600;}
+h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
+.eyebrow{color:var(--rt-yellow); letter-spacing:.34em; text-transform:uppercase;
+  font-size:clamp(10px,1.3vh,13px); font-weight:800; margin:0;
+  opacity:.85; text-indent:.34em;}   /* indent компенсирует разрядку последней буквы */
+/* Строка меры: длинные строки на широком экране читаются хуже коротких.
+   Ограничиваем ~52 знака и балансируем перенос, чтобы строки были равными. */
+.lead{color:#e2e2e8; font-size:min(3.2vw,2.6vh,23px); line-height:1.5;
+  max-width:min(52ch,92vw); margin:calc(var(--gap-v) * 1.1) auto 0;
+  text-wrap:balance; letter-spacing:.005em;}
+/* Призыв к действию — отдельной строкой, тише и мельче: он ведёт к кнопке,
+   а не спорит с описанием за внимание. */
+.lead-cta{color:#9d9da6; font-size:min(2.7vw,2.1vh,18px); line-height:1.45;
+  max-width:min(46ch,92vw); margin:.55em auto calc(var(--gap-v) * 1.6);
+  text-wrap:balance;}
+.sub{color:#a2a2ab; font-size:min(3vw,2.3vh,20px);
+  margin:.2em 0 calc(var(--gap-v) + 4px);}
+
+/* ═══════════════════════════════════════
+   ГЛОБАЛЬНЫЙ ТОПБАР
+═══════════════════════════════════════ */
+/* padding-top на безопасную зону: в полноэкранном режиме заголовок иначе
+   оказывается прямо под часами и значком батареи. */
+.global-topbar{
+  position:fixed; top:0; left:0; right:0; z-index:20;
+  display:flex; align-items:center;
+  padding:env(safe-area-inset-top, 0px) max(24px, env(safe-area-inset-left, 0px)) 0;
+  height:calc(var(--bar-top) - 16px + env(safe-area-inset-top, 0px));
+  transition:background .35s ease;
+  pointer-events:none;
+}
+
+/* Название события слева. Набирается лок-апом: знак → тонкая линейка →
+   плотное белое название → точка → город разрядкой жёлтым. Линейка отделяет
+   знак от текста, иначе они читаются как одно слипшееся пятно. */
+.global-topbar-title{
+  display:flex; align-items:center; gap:clamp(8px,.8vw,13px);
+  padding-left:clamp(12px,1.3vw,20px);
+  border-left:1px solid rgba(255,255,255,.2);
+  color:#fff; white-space:nowrap;
+  text-shadow:0 1px 8px rgba(0,0,0,.7);
+}
+.tb-main{
+  font-size:clamp(13px,1.05vw,17px); font-weight:900;
+  letter-spacing:.13em; text-transform:uppercase;
+}
+.tb-sub{
+  font-size:clamp(10px,.8vw,13px); font-weight:700;
+  letter-spacing:.26em; text-transform:uppercase;
+  color:var(--rt-yellow); opacity:.9;
+}
+/* Разделитель — ромб под срез углов знака, а не типографская точка */
+.tb-dot{
+  width:5px; height:5px; flex:0 0 auto;
+  background:var(--rt-yellow); opacity:.55;
+  transform:rotate(45deg);
+}
+@media (max-width:640px){
+  .global-topbar-title{gap:7px; padding-left:9px;}
+  .tb-sub, .tb-dot{display:none;}   /* в узкий топбар город не влезает */
+}
+
+/* Режим внутренних экранов — тёмный фон как нижняя полоса + логотипы справа */
+.global-topbar.inner{
+  background:rgba(13,13,15,.94);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid rgba(255,255,255,.1);
+  box-shadow:0 2px 20px rgba(0,0,0,.5);
+  height:calc(var(--bar-top) + env(safe-area-inset-top, 0px));
+  pointer-events:auto;
+}
+.global-topbar.inner .global-topbar-title{ text-shadow:none; }
+.global-topbar.inner .tb-main{ font-size:clamp(12px,.95vw,15px); letter-spacing:.15em; }
+
+/* Фирменный знак «rt» слева в топбаре — он же метка бренда на всех экранах.
+   Высота считается от полосы: знак не должен спорить с названием события. */
+.brand-mark{
+  height:clamp(30px,calc(var(--bar-top) - 28px),52px); width:auto;
+  margin-right:clamp(12px,1.6vw,22px); flex:0 0 auto;
+}
+.global-topbar.inner .brand-mark{
+  height:clamp(32px,calc(var(--bar-top) - 22px),58px);
+}
+@media (max-width:640px){ .brand-mark{height:26px; margin-right:10px;} }
+
+/* Логотипы в топбаре (правая часть, только на внутренних экранах) */
+.topbar-logos{
+  display:none;
+  align-items:center;
+  margin-left:auto;
+  height:100%;
+}
+.global-topbar.inner .topbar-logos{
+  display:flex;
+}
+.topbar-logos img{
+  height:clamp(22px,calc(var(--bar-top) - 30px),52px); width:auto;
+  max-width:clamp(70px,12vw,180px);
+  object-fit:contain; opacity:.95;
+  padding:0 clamp(10px,2vw,28px); flex:0 1 auto; min-width:0;
+}
+.topbar-logos img + img{
+  border-left:1px solid rgba(255,255,255,.15);
+}
+
+/* ═══════════════════════════════════════
+   ГЛОБАЛЬНАЯ НИЖНЯЯ ПОЛОСА ПАРТНЁРОВ
+═══════════════════════════════════════ */
+.global-partners.empty{display:none;}
+.global-partners{
+  position:fixed; bottom:0; left:0; right:0; z-index:20;
+  background:rgba(13,13,15,.92);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-top:1px solid rgba(255,255,255,.1);
+  /* env() здесь напрямую, а не через переменную: часть версий Safari не
+     разворачивает env() внутри custom property, и полоса тогда не дотягивалась
+     до низа — под ней оставался кант цвета фона страницы. */
+  /* Половина безопасной зоны, а не вся: индикатор — тонкая полоска у самого
+     края, и полные 34px оставляли под логотипами заметный пустой провал. */
+  padding:8px max(20px, env(safe-area-inset-left, 0px))
+          calc(6px + env(safe-area-inset-bottom, 0px) * 0.5);
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  min-height:calc(var(--bar-bottom) + env(safe-area-inset-bottom, 0px) * 0.5);
+  justify-content:center;
+}
+.global-partners-label{
+  color:rgba(255,255,255,.38); font-size:clamp(8px,.75vw,9px); font-weight:700;
+  letter-spacing:2.5px; text-transform:uppercase;
+}
+.global-partners-logos{
+  display:flex; align-items:center; justify-content:center;
+  flex-wrap:nowrap; width:100%;
+}
+.global-partners-logos img{
+  height:clamp(26px,calc(var(--bar-bottom) - 44px),62px); width:auto;
+  max-width:clamp(80px,17%,200px);
+  object-fit:contain; opacity:.95;
+  padding:0 clamp(10px,2.4vw,36px); flex:0 1 auto; min-width:0;
+}
+.global-partners-logos img + img{
+  border-left:1px solid rgba(255,255,255,.15);
+}
+
+/* ═══════════════════════════════════════
+   КНОПКИ
+═══════════════════════════════════════ */
+/* Кнопки не мельче 44px по высоте — минимум для пальца на планшете. */
+.btn-primary{
+  background:linear-gradient(180deg,#ffc20e,#e8ae00); color:#0d0d0f; border:none;
+  border-radius:16px; padding:clamp(13px,1.8vh,18px) clamp(22px,3vw,34px);
+  font-size:clamp(16px,2vh,20px); font-weight:700; cursor:pointer; min-height:44px;
+  box-shadow:0 10px 30px rgba(0,0,0,.35); transition:transform .1s;
+}
+.btn-primary:active{transform:scale(.96);}
+.btn-primary.big{font-size:min(4vw,2.6vh,26px);
+  padding:clamp(15px,2.2vh,22px) clamp(28px,4vw,44px); border-radius:20px;}
+/* Фиолетовый вариант основной кнопки — «Загрузить с телефона» на экране съёмки.
+   Текст длиннее, чем у «Снять», поэтому кегль и отступы чуть меньше — иначе
+   кнопка выходила заметно крупнее соседней и перетягивала внимание. */
+.btn-primary.btn-violet{
+  background:linear-gradient(180deg,#26262b,#1a1a1e);
+  color:#ffc20e; border:1.5px solid rgba(255,194,14,.45);
+}
+.btn-ghost{
+  background:transparent; color:#a2a2ab; border:1.5px solid #3a3a42; border-radius:14px;
+  padding:clamp(11px,1.5vh,14px) clamp(18px,2.5vw,26px);
+  font-size:clamp(15px,1.9vh,18px); cursor:pointer; min-height:44px;
+  margin-top:var(--gap-v);
+}
+.btn-ghost:active{background:rgba(255,255,255,.06);}
+.row{display:flex; gap:clamp(10px,1.6vw,18px); align-items:center;
+  margin-top:10px; flex-wrap:wrap; justify-content:center;}
+.upload{display:inline-flex; align-items:center;}
+
+/* ═══════════════════════════════════════
+   ЛОКАЦИИ
+═══════════════════════════════════════ */
+/* Раскладка «три сверху, два снизу»: flex с переносом по три в ряд.
+   Именно flex, а не grid: у сетки последний неполный ряд прижимается влево,
+   а здесь justify-content:center сам центрирует оставшиеся две плитки. */
+.grid{--loc-gap:clamp(10px,1.4vw,18px);
+  display:flex; flex-wrap:wrap; justify-content:center; align-items:stretch;
+  gap:var(--loc-gap); width:100%; max-width:min(94vw,1100px);}
+.grid > .loc{flex:0 1 calc((100% - var(--loc-gap) * 2) / 3); min-width:0;}
+/* Узкий экран (телефон, портретный киоск): три колонки не читаются — по две в ряд. */
+@media (max-width:760px){
+  .grid > .loc{flex:0 1 calc((100% - var(--loc-gap)) / 2);}
+}
+.loc{
+  background:rgba(255,255,255,.07); border:1.5px solid #2b2b31; border-radius:20px;
+  padding:clamp(16px,2.4vh,24px) clamp(12px,1.2vw,18px);
+  cursor:pointer; text-align:center; transition:transform .12s, border-color .12s;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:clamp(96px,12vh,140px);
+}
+.loc:active{transform:scale(.97);}
+.loc.on{border-color:var(--rt-yellow);}
+.loc.off{opacity:.4; pointer-events:none;}
+/* Заголовок переносится «сбалансированно» — «Держим технику / в строю»
+   вместо «Держим технику в / строю». */
+.loc h3{margin:0 0 7px; color:#fff; font-size:clamp(18px,2.7vh,27px);
+  line-height:1.2; text-wrap:balance; hyphens:none;}
+/* Слоган стоит сразу под названием — оба текста читаются как один блок,
+   поэтому пара плотная, а свободное место уходит в поля плитки. */
+.loc-slogan{margin:0; color:var(--rt-yellow); font-size:clamp(13px,1.9vh,18px);
+  font-style:italic; line-height:1.3; text-wrap:balance;}
+/* Портретный планшет: экран высокий, но плитка узкая — кегль, посчитанный от
+   высоты, ломает названия на три строки. Здесь считаем скромнее. */
+@media (max-width:900px){
+  .loc h3{font-size:clamp(16px,2.1vh,21px);}
+  .loc-slogan{font-size:clamp(12px,1.6vh,15px);}
+}
+.loc.off .loc-slogan{color:#7a7a84;}
+.loc .soon{color:var(--accent); font-size:12px; font-weight:700; margin-top:10px;}
+
+/* ═══════════════════════════════════════
+   ОБРАЗ
+═══════════════════════════════════════ */
+.outfit-grid{display:flex; gap:clamp(14px,2.4vw,24px); flex-wrap:wrap;
+  justify-content:center; max-width:760px; width:100%;}
+.outfit{background:rgba(255,255,255,.07); border:1.5px solid #2b2b31; border-radius:22px;
+  padding:clamp(18px,3vh,30px) clamp(18px,2.4vw,28px);
+  width:min(300px,44%); min-width:220px; cursor:pointer;
+  transition:transform .12s, border-color .12s;}
+.outfit:active{transform:scale(.97);}
+/* hover только там, где есть мышь: на планшете подсветка залипает после тапа */
+@media (hover:hover){ .outfit:hover{border-color:var(--rt-yellow);} }
+.outfit .emoji{font-size:clamp(34px,5vh,52px); margin-bottom:8px;}
+.outfit h3{margin:0 0 8px; color:#fff; font-size:clamp(19px,2.7vh,26px);}
+.outfit p{margin:0; color:#a2a2ab; font-size:clamp(14px,1.9vh,16px);}
+
+/* ═══════════════════════════════════════
+   КАМЕРА
+═══════════════════════════════════════ */
+/* Овал крупнее и опущен ниже: при 52%/42% подбородок и губы оказывались на самой
+   границе, гость подавался назад — и в кадр попадало мелкое лицо. Теперь нижний
+   край овала на 78% высоты кадра, рот заведомо внутри. */
+.face-guide{position:absolute; left:50%; top:45%; transform:translate(-50%,-50%);
+  width:66%; aspect-ratio:3/4; border:3px dashed rgba(255,255,255,.85); border-radius:50%;
+  box-shadow:0 0 0 1000px rgba(0,0,0,.45); pointer-events:none; z-index:2;}
+/* Размер задаём по ВЫСОТЕ: раньше кадр считался от ширины (min(70vw,540px)) и в
+   ландшафте iPad вырастал до 720px — экран съёмки не помещался, кнопка «Снять»
+   уезжала за край и была недоступна. Третий член min() страхует по ширине,
+   чтобы на узких экранах пропорция 3:4 не ломалась. */
+/* margin-inline:auto обязателен: блок считает ширину из aspect-ratio и без него
+   прижимается к левому краю. Раньше это не бросалось в глаза — кадр был самым
+   широким элементом, и колонка ужималась по нему; теперь он уже кнопок. */
+.camera-wrap{position:relative;
+  height:min(calc(56vh - var(--safe-top) - var(--safe-bottom)), 600px, 117vw);
+  width:auto; aspect-ratio:3/4;
+  border-radius:24px; overflow:hidden;
+  background:#000; box-shadow:0 12px 40px rgba(0,0,0,.5);
+  margin:var(--gap-v) auto calc(var(--gap-v) + 8px);}
+/* Порог 1100px закрывает iPad 12.9 в ландшафте (1366×1024), Full HD и ноутбуки:
+   там кадру нужно уступить место заголовку и кнопкам, иначе экран съёмки уходит
+   в прокрутку. В портрете (высота 1366) правило не срабатывает — кадр крупный. */
+@media (max-height:1100px){
+  .camera-wrap{height:min(calc(50vh - var(--safe-top) - var(--safe-bottom)), 600px, 117vw);}
+}
+/* Ноутбуки 768px: там даже поджатых отступов не хватает */
+@media (max-height:800px){
+  .camera-wrap{height:min(calc(48vh - var(--safe-top) - var(--safe-bottom)), 600px, 117vw);}
+}
+/* Экран съёмки самый плотный. Чтобы кадр остался крупным (гость подходит ближе —
+   лицо в кадре крупнее — распознавание точнее), место отыгрываем на отступах,
+   а не на размере кадра. */
+#camera-mode .sub{margin-bottom:4px;}
+#camera-mode .camera-wrap{margin-top:6px;}
+#camera-mode .row{margin-top:10px;}
+/* Экран съёмки прижимался к верхней полосе — опускаем весь блок ниже.
+   Отступ считается от высоты экрана, поэтому на низких мониторах не съедает кадр. */
+#camera-mode{margin-top:clamp(10px,4.5vh,52px);}
+/* «Снять» и «Загрузить с телефона» — одна форма: равные высота, скругление и
+   минимальная ширина. Раньше вторая была мельче по кеглю и отступам и рядом
+   с первой смотрелась второстепенной кнопкой другого размера. */
+#camera-mode .row .btn-primary{
+  font-size:min(3.2vw,2.2vh,21px);
+  padding:clamp(14px,2vh,20px) clamp(20px,2.6vw,30px);
+  border-radius:18px;
+  min-width:clamp(190px,25vw,280px);
+  min-height:clamp(52px,7vh,68px);
+  display:inline-flex; align-items:center; justify-content:center;
+}
+#video{width:100%; height:100%; object-fit:cover; transform:scaleX(-1);}
+.cam-error{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; padding:20px; background:rgba(0,0,0,.6);}
+
+/* ═══════════════════════════════════════
+   ЭКРАН ЗАГРУЗКИ (редизайн)
+═══════════════════════════════════════ */
+.loading-inner{
+  display:flex; flex-direction:column; align-items:center; gap:18px;
+  width:100%; max-width:900px;   /* хватает, чтобы пять логотипов встали в строку */
+}
+.loading-eyebrow{
+  color:rgba(255,194,14,.9); font-size:11px; font-weight:800;
+  letter-spacing:3px; text-transform:uppercase; margin:0;
+}
+.loading-title{
+  color:#fff; font-size:min(6.5vw,44px); margin:0; font-weight:700;
+}
+.loading-bar{
+  width:100%; max-width:480px; height:4px;
+  background:rgba(255,255,255,.1); border-radius:2px; overflow:hidden;
+}
+.loading-bar-fill{
+  height:100%; width:0%; border-radius:2px;
+  background:linear-gradient(90deg,#e0a800 0%,#ffc20e 100%);
+  transition:width .6s ease;
+}
+
+/* Секция партнёров на загрузке */
+.loading-sponsors{
+  display:flex; flex-direction:column; align-items:center; gap:16px;
+  margin-top:16px; padding:24px clamp(14px,3vw,36px);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:22px;
+  background:rgba(13,13,15,.72);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  width:100%;
+}
+.loading-sponsors-label{
+  color:rgba(255,255,255,.42); font-size:10px; font-weight:800;
+  letter-spacing:3px; text-transform:uppercase; margin:0;
+}
+/* Пятый логотип раньше срывался на вторую строку: nowrap + гибкие отступы
+   держат всех в одну линию и на узких экранах киоска тоже. */
+.loading-sponsors-logos{
+  display:flex; align-items:center; justify-content:center;
+  flex-wrap:nowrap; width:100%;
+}
+.loading-sponsors-logos img{
+  height:clamp(26px,6vh,52px); width:auto; max-width:clamp(80px,19%,200px);
+  object-fit:contain; opacity:.9;
+  padding:0 clamp(8px,1.8vw,24px);
+  flex:0 1 auto; min-width:0;
+}
+.loading-sponsors-logos img + img{
+  border-left:1px solid rgba(255,255,255,.15);
+}
+
+/* ═══════════════════════════════════════
+   ВАРИАНТЫ, КАРТОЧКА, ФИНАЛ
+═══════════════════════════════════════ */
+.spinner{width:80px; height:80px; border:7px solid rgba(255,255,255,.15); border-top-color:var(--rt-yellow);
+  border-radius:50%; animation:spin 1s linear infinite; margin-bottom:24px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.variants{display:flex; gap:clamp(12px,2vw,22px); flex-wrap:wrap; justify-content:center;}
+/* тоже по высоте — иначе на низких экранах кадры вылезают за пределы */
+.variants img{height:min(52vh,420px,60vw); width:auto; aspect-ratio:3/4; object-fit:cover; border-radius:18px;
+  border:4px solid transparent; cursor:pointer; box-shadow:0 8px 26px rgba(0,0,0,.4); transition:transform .12s, border-color .12s;}
+.variants img:active{transform:scale(.97);}
+.variants img.sel{border-color:var(--rt-yellow);}
+
+/* flex-start, а не center: колонка с QR короче карточки и при центрировании
+   всплывала выше её верхнего края — на iPad на 48px. Теперь обе начинаются
+   от одной линии на любом экране. */
+.card-view{display:flex; gap:clamp(18px,3vw,40px); align-items:flex-start;
+  flex-wrap:wrap; justify-content:center; width:100%;}
+/* Только ограничения, без жёсткой height. Раньше высота задавалась намертво
+   (62vh), а ширину на телефоне резало 42vw ≈ 165px — картинка вписывалась по
+   ширине, и сверху-снизу оставались широкие белые поля от фона элемента.
+   Теперь обе стороны — максимумы, размер считается по пропорции карточки. */
+#card-img{max-height:min(62vh,540px); max-width:min(88vw,380px);
+  width:auto; height:auto;
+  border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.5); background:#fff;}
+.card-side{display:flex; flex-direction:column; align-items:center; gap:8px;
+  width:min(100%,340px);}
+/* QR опущен вниз, а подпись под ним прижата к кнопке печати: раньше между
+   подписью и кнопкой зияла дыра, а сам QR висел выше верхнего края карточки. */
+.qr{width:clamp(96px,14vh,150px); height:clamp(96px,14vh,150px);
+  background:#fff; border-radius:12px; padding:8px;
+  margin-top:clamp(4px,1.6vh,16px);}
+.card-side .sub{margin-bottom:0;}
+
+/* ═══════════════════════════════════════
+   QR-ЗАГРУЗКА ФОТО С ТЕЛЕФОНА
+═══════════════════════════════════════ */
+.qr-upload-img{
+  width:min(50vw,280px); height:min(50vw,280px);
+  background:#fff; border-radius:16px; padding:10px;
+  margin:16px 0;
+}
+.qr-waiting{
+  color:var(--rt-yellow); font-size:16px; font-weight:600;
+  letter-spacing:1px; animation:pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* ═══════════════════════════════════════
+   EMAIL-БЛОК НА ЭКРАНЕ КАРТОЧКИ
+═══════════════════════════════════════ */
+.email-block{
+  width:100%; max-width:100%; box-sizing:border-box; margin-top:14px;
+  padding:16px 20px;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;
+  text-align:center;   /* подпись и статус по центру блока, как заголовки экранов */
+}
+.email-label{
+  color:rgba(255,255,255,.5); font-size:12px; font-weight:600;
+  letter-spacing:1px; text-transform:uppercase; margin:0 0 10px;
+}
+.email-row{display:flex; gap:8px; width:100%;}
+/* min-width:0 обязателен: у input свой минимальный размер (~180px), из-за него
+   строка не сжималась и кнопка «Отправить» вылезала за правый край блока. */
+.email-input{
+  flex:1 1 auto; min-width:0; width:100%;
+  background:rgba(255,255,255,.08); border:1.5px solid rgba(255,255,255,.2);
+  border-radius:12px; padding:12px 16px; color:#fff; font-size:16px;
+  outline:none; transition:border-color .2s;
+}
+.email-input::placeholder{color:rgba(255,255,255,.35);}
+.email-input:focus{border-color:var(--rt-yellow);}
+.btn-email{
+  flex:0 0 auto;                     /* кнопка не растягивается и не сжимается */
+  background:linear-gradient(180deg,#ffc20e,#e8ae00); color:#0d0d0f; border:none;
+  border-radius:12px; padding:12px 18px; font-size:15px; font-weight:700;
+  cursor:pointer; white-space:nowrap; transition:transform .1s, opacity .2s;
+}
+.btn-email:active{transform:scale(.96);}
+.btn-email:disabled{opacity:.4; cursor:default;}
+.email-status{
+  margin:10px 0 0; font-size:13px; min-height:18px;
+  color:var(--rt-yellow);
+}
+.email-status.error{color:#f87171;}
+
+/* На совсем низких окнах (ноутбук с открытыми панелями) правая колонка карточки
+   не помещалась — поджимаем блок почты, он там самый объёмный. */
+@media (max-height:760px){
+  .card-side{gap:5px;}
+  .email-block{margin-top:8px; padding:10px 14px;}
+  .email-label{margin-bottom:6px; font-size:11px;}
+  .email-status{margin-top:6px; min-height:14px; font-size:12px;}
+  .email-input{padding:10px 14px;}
+}
+
+/* ═══════════════════════════════════════
+   ПЕЧАТЬ С УСТРОЙСТВА (на iPad — AirPrint)
+   На лист уходит только карточка: интерфейс, фон-видео и полосы логотипов
+   скрыты, поля страницы убраны, картинка вписывается в лист целиком.
+═══════════════════════════════════════ */
+@media print{
+  @page{margin:0;}
+  html,body{height:auto; background:#fff; overflow:visible;}
+  body *{visibility:hidden;}
+  .site-bg-video,.site-bg-overlay,.global-topbar,.global-partners{display:none !important;}
+  #card-img,#card-img *{visibility:visible;}
+  #card-img{
+    position:fixed; inset:0; margin:auto;
+    max-width:100%; max-height:100%; width:auto; height:auto;
+    box-shadow:none; border-radius:0;
+  }
+}
+
+.check{width:clamp(72px,11vh,110px); height:clamp(72px,11vh,110px); border-radius:50%;
+  background:var(--rt-yellow); color:#0d0d0f; font-size:clamp(42px,6.4vh,64px);
+  display:flex; align-items:center; justify-content:center; margin-bottom:16px;
+  flex-shrink:0; box-shadow:0 10px 30px rgba(0,0,0,.4);}
+.countdown{color:#7a7a84; margin-top:20px;}
+.hidden{display:none;}

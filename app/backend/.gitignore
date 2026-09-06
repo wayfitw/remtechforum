@@ -1,0 +1,5 @@
+.venv/
+.env
+assets/output/*
+!assets/output/.gitkeep
+__pycache__/

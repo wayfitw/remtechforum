@@ -1,0 +1,9 @@
+# Скрипты и конфиги для Linux-сервера — всегда LF.
+# Иначе при клонировании из Windows-репозитория bash падает с
+# "bad interpreter: /usr/bin/env bash^M".
+*.sh            text eol=lf
+deploy/*        text eol=lf
+app/run.sh      text eol=lf
+
+# Windows-скрипты — CRLF
+*.bat           text eol=crlf

@@ -1,0 +1,17 @@
+[Unit]
+Description=Ремтехника — AI-фотоинсталляция (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__APP_DIR__/app/backend
+ExecStart=__APP_DIR__/app/backend/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=5
+# генерация занимает до ~5 минут — не убивать по таймауту
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

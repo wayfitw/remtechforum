@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- Киоск на iPad: после «Поделиться → На экран Домой» сайт открывается
+     во весь экран, без адресной строки и панелей Safari -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ремтехника">
+<meta name="theme-color" content="#0d0d0f">
+<title>Ремтехника — AI-фотоинсталляция</title>
+<link rel="stylesheet" href="styles.css?v=__V__">
+</head>
+<body>
+<div id="app">
+
+  <!-- Глобальный фон: зацикленное видео. Пока ролика нет, тег закомментирован —
+       иначе браузер на каждой загрузке ловит 404 по mp4 и постеру. Появится
+       media/intro.mp4 + media/intro-poster.jpg — раскомментировать.
+  <video class="site-bg-video" autoplay muted loop playsinline preload="auto" poster="media/intro-poster.jpg">
+    <source src="media/intro.mp4" type="video/mp4">
+  </video>
+  -->
+  <div class="site-bg-overlay"></div>
+
+  <!-- ═══ ГЛОБАЛЬНЫЙ ТОПБАР ═══ -->
+  <div class="global-topbar" id="global-topbar">
+    <img class="brand-mark" src="/logos/_rt_badge.png" alt="Ремтехника">
+    <span class="global-topbar-title" id="topbar-title"><span class="tb-main">ExpoDrev Russia 26</span><span class="tb-dot"></span><span class="tb-sub">Красноярск</span></span>
+    <div class="topbar-logos" id="topbar-logos"></div>
+  </div>
+
+  <!-- ═══ ГЛОБАЛЬНАЯ НИЖНЯЯ ПОЛОСА ПАРТНЁРОВ ═══ -->
+  <div class="global-partners">
+    <div class="global-partners-label">ПРОЕКТ РЕАЛИЗОВАН ПРИ ПОДДЕРЖКЕ</div>
+    <div class="global-partners-logos" id="welcome-logos"></div>
+  </div>
+
+  <!-- 1. Приветствие -->
+  <section class="screen active" data-screen="welcome">
+    <div class="hero">
+      <p class="eyebrow">Интерактивная AI-фотоинсталляция</p>
+      <h1><span class="q">«</span>Я в <span>деле</span><span class="q">»</span></h1>
+      <p class="lead">За полминуты вы окажетесь на лесосеке, в сервисной зоне или на Красноярских Столбах — и не только.</p>
+      <p class="lead-cta">Сделайте фото и заберите карточку на память.</p>
+      <button class="btn-primary big" data-go="locations">Выйти на смену →</button>
+    </div>
+  </section>
+
+  <!-- 2. Выбор локации -->
+  <section class="screen" data-screen="locations">
+    <h2>Куда отправимся?</h2>
+    <p class="sub">Выберите площадку</p>
+    <div id="locations" class="grid"></div>
+    <button class="btn-ghost" data-go="welcome">← Назад</button>
+  </section>
+
+  <!-- 2b. Выбор образа -->
+  <section class="screen" data-screen="outfit">
+    <h2>Выберите образ</h2>
+    <p class="sub">В чём выходим на площадку?</p>
+    <div class="outfit-grid">
+      <div class="outfit" data-outfit="female">
+        <div class="emoji" id="outfit-emoji-female">👷‍♀️</div>
+        <h3>Женский</h3>
+        <p class="outfit-desc">Фирменная спецовка Ремтехники и кепка</p>
+      </div>
+      <div class="outfit" data-outfit="male">
+        <div class="emoji" id="outfit-emoji-male">👷‍♂️</div>
+        <h3>Мужской</h3>
+        <p class="outfit-desc">Фирменная спецовка Ремтехники и кепка</p>
+      </div>
+    </div>
+    <button class="btn-ghost" data-go="locations">← Назад</button>
+  </section>
+
+  <!-- 3. Съёмка -->
+  <section class="screen" data-screen="capture">
+    <!-- Режим камеры -->
+    <div id="camera-mode">
+      <h2 id="capture-title">Сделайте фотографию</h2>
+      <p class="sub">Лицо — в овале</p>
+      <div class="camera-wrap">
+        <video id="video" autoplay playsinline></video>
+        <div class="face-guide"></div>
+        <div id="cam-error" class="cam-error hidden">Камера недоступна — загрузите фото ниже</div>
+      </div>
+      <div class="row">
+        <button class="btn-primary big" id="shoot">📸 Снять</button>
+        <button class="btn-primary big btn-violet" id="qr-upload-btn">📱 Загрузить с телефона</button>
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <button class="btn-ghost" data-go="locations">← Другая локация</button>
+    </div>
+
+    <!-- Режим QR-загрузки -->
+    <div id="qr-mode" class="hidden">
+      <h2>Загрузите фото с телефона</h2>
+      <p class="sub">Наведите камеру на QR-код и выберите фото из галереи</p>
+      <img id="qr-upload-img" class="qr-upload-img" alt="QR">
+      <p class="qr-waiting" id="qr-waiting">Ожидаем фото…</p>
+      <button class="btn-ghost" id="qr-cancel">← Вернуться к камере</button>
+    </div>
+  </section>
+
+  <!-- 4. Генерация -->
+  <section class="screen" data-screen="loading">
+    <div class="loading-inner">
+      <p class="loading-eyebrow" id="loading-timer">ИДЁТ ГЕНЕРАЦИЯ</p>
+      <h2 class="loading-title">Собираем ваш кадр…</h2>
+      <div class="loading-bar"><div class="loading-bar-fill" id="loading-bar-fill"></div></div>
+      <div class="loading-sponsors">
+        <p class="loading-sponsors-label">ИНСТАЛЛЯЦИЮ СДЕЛАЛИ ВОЗМОЖНОЙ</p>
+        <div class="loading-sponsors-logos" id="loading-logos"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Выбор варианта -->
+  <section class="screen" data-screen="variants">
+    <h2>Выберите лучший кадр</h2>
+    <p class="sub" id="variants-loc"></p>
+    <div id="variants" class="variants"></div>
+    <button class="btn-ghost" id="retake">↺ Переснять</button>
+  </section>
+
+  <!-- 6. Карточка -->
+  <section class="screen" data-screen="card">
+    <h2>Ваша фото-карточка</h2>
+    <div class="card-view">
+      <img id="card-img" alt="карточка">
+      <div class="card-side">
+        <img id="qr-img" class="qr" alt="QR">
+        <p class="sub">Наведите камеру телефона<br>на QR — заберёте цифровую версию</p>
+        <button class="btn-primary big" id="print">🖨 Отправить в печать</button>
+        <div class="email-block">
+          <p class="email-label">Получить карточку по почте</p>
+          <div class="email-row">
+            <input type="email" id="email-input" class="email-input" placeholder="your@email.com" autocomplete="email">
+            <button class="btn-email" id="send-email">Отправить</button>
+          </div>
+          <p class="email-status" id="email-status"></p>
+        </div>
+        <button class="btn-ghost" data-go="variants" id="back-to-variants">← Выбрать другой кадр</button>
+        <button class="btn-ghost" data-go="welcome" id="finish">Готово</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Финал -->
+  <section class="screen" data-screen="done">
+    <div class="check">✓</div>
+    <h2 id="done-title">Готово!</h2>
+    <p class="sub" id="done-note">Заберите карточку у стенда «Ремтехника»</p>
+    <p class="countdown">Возврат к началу через <span id="cd">8</span>…</p>
+  </section>
+
+</div>
+<script src="app.js?v=__V__"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+google-genai
+pillow
+python-multipart
+qrcode[pil]
+replicate
+# ArcFace-метрика сходства лиц (гейт входа + ранжирование вариантов)
+insightface
+onnxruntime
+opencv-python
+numpy

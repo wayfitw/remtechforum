@@ -1,0 +1,15 @@
+# секреты — НИКОГДА не коммитим
+app/backend/.env
+
+# окружение и кэши
+app/backend/.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# сгенерированные кадры и отладка (личные фото гостей)
+app/backend/assets/output/*
+!app/backend/assets/output/.gitkeep
+
+# скачанные агентом печати карточки
+tools/printed/

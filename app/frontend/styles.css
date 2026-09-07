@@ -166,7 +166,11 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
 .brand-mark{
   height:clamp(30px,calc(var(--bar-top) - 28px),52px); width:auto;
   margin-right:clamp(12px,1.6vw,22px); flex:0 0 auto;
+  /* Знак работает кнопкой «на главную». pointer-events нужен явно: на
+     приветственном экране вся полоса прозрачна для кликов. */
+  cursor:pointer; pointer-events:auto; transition:transform .12s, opacity .12s;
 }
+.brand-mark:active{transform:scale(.94); opacity:.85;}
 .global-topbar.inner .brand-mark{
   height:clamp(32px,calc(var(--bar-top) - 22px),58px);
 }

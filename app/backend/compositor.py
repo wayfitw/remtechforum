@@ -16,7 +16,7 @@ import io
 from pathlib import Path
 from typing import List, Optional
 
-from PIL import Image, ImageOps, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageOps, ImageDraw, ImageFont, ImageFilter, ImageStat
 
 import config
 
@@ -70,15 +70,6 @@ def _load_logos() -> List[Image.Image]:
     тёмного интерфейса киоска и на белой карточке были бы не видны.
     """
     logos: List[Image.Image] = []
-    # Знак «rt» идёт первым и в ОДНОМ ключе с партнёрскими: только буквы,
-    # без плашки, под ними «РЕМТЕХНИКА» разряженным капсом. Жёлтая плашка
-    # в ряду перетягивала внимание на себя.
-    badge = config.CARD_LOGOS / "_rt_mono.png"
-    if badge.exists():
-        try:
-            logos.append(Image.open(badge).convert("RGBA"))
-        except Exception:
-            pass
     if config.CARD_LOGOS.exists():
         for p in sorted(config.CARD_LOGOS.glob("0*.png")):
             try:
@@ -133,16 +124,24 @@ def build_card(generated_png: bytes,
         # рукописный текст тонул на светлых кадрах — на «Столбах» подпись
         # ложится на небо и долину и не читалась вовсе.
         band = int(min(photo.height, (photo.height - y) + line_h))
+
+        # Сила подложки — ПО ЯРКОСТИ кадра под подписью. Фиксированные 165
+        # хватало тёмному лесу, но не светлой долине Столбов: там текст всё
+        # равно сливался. Меряем и добавляем ровно столько, сколько нужно.
+        strip = photo.crop((0, photo.height - band, photo.width, photo.height))
+        lum = ImageStat.Stat(strip.convert("L")).mean[0]
+        peak = int(min(240, max(120, 120 + (lum - 60) * 1.15)))
         grad = Image.new("L", (1, band))
         for i in range(band):
             k = i / max(band - 1, 1)                 # 0 сверху → 1 снизу
-            grad.putpixel((0, i), int(165 * (k ** 1.6)))
+            grad.putpixel((0, i), int(peak * (k ** 1.6)))
         scrim = Image.new("RGBA", (photo.width, band), (0, 0, 0, 0))
         scrim.putalpha(grad.resize((photo.width, band)))
         ov.alpha_composite(scrim, (0, photo.height - band))
 
+        shadow_a = 130 if lum < 120 else 190      # на светлом фоне тень плотнее
         for ln in caption_lines:
-            od.text((x + 2, y + 2), ln, font=f_cap, fill=(0, 0, 0, 130))   # тень
+            od.text((x + 2, y + 2), ln, font=f_cap, fill=(0, 0, 0, shadow_a))   # тень
             od.text((x, y), ln, font=f_cap, fill=(255, 255, 255, 235))
             y += line_h
         photo = Image.alpha_composite(photo.convert("RGBA"), ov).convert("RGB")

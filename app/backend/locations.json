@@ -38,7 +38,8 @@
     "card_footer": "«Ремтехника» · ExpoDrev Russia 26 · Красноярск",
     "light": "soft overcast daylight in a forest, even and slightly cool, no hard shadows, no warm sunset cast.",
     "frame_fill": 0,
-    "frame_cx": 0.68
+    "frame_cx": 0.68,
+    "mode": "composite"
   },
   "service": {
     "id": "service",
@@ -59,7 +60,8 @@
     "card_footer": "«Ремтехника» · ExpoDrev Russia 26 · Красноярск",
     "light": "indoor workshop light: cool overhead fluorescent from above mixed with a warm work lamp from the side, soft shadows, no daylight sun.",
     "frame_fill": 0,
-    "frame_cx": 0.44
+    "frame_cx": 0.44,
+    "mode": "composite"
   },
   "stolby": {
     "id": "stolby",
@@ -100,6 +102,6 @@
     ],
     "card_footer": "«Ремтехника» · ExpoDrev Russia 26 · Красноярск",
     "light": "warm golden-hour sunset light coming from BEHIND the person through the trees — a strong amber rim light along the shoulders, head and arms, the front of the body in soft warm shade, long low sun, no flat frontal daylight.",
-    "mode": "composite"
+    "mode": "edit"
   }
 }

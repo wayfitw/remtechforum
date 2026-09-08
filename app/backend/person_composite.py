@@ -77,19 +77,77 @@ def _remove_bg(image_bytes: bytes) -> bytes | None:
             return None
 
 
-def _match_colors(person: Image.Image, scene: Image.Image, strength: float = 0.35) -> Image.Image:
-    """Мягко подгоняет яркость/тон человека под сцену (по нижней половине кадра)."""
-    scene_stat = ImageStat.Stat(scene.crop((0, scene.height // 2, scene.width, scene.height)))
-    rgb = person.convert("RGB")
-    person_stat = ImageStat.Stat(rgb, mask=person.split()[3])
-    out = rgb
-    # яркостная подгонка
-    p_mean = sum(person_stat.mean) / 3 or 1.0
-    s_mean = sum(scene_stat.mean) / 3
-    factor = 1 + ((s_mean / p_mean) - 1) * strength
-    out = ImageEnhance.Brightness(out).enhance(max(0.7, min(1.3, factor)))
-    out.putalpha(person.split()[3])
+def _clean_edge(person: Image.Image, erode: int = 2, feather: float = 1.2) -> Image.Image:
+    """Убирает кайму вокруг вырезки.
+
+    Background-remover оставляет по контуру полупрозрачные пиксели, подкрашенные
+    СЕРЫМ студийным фоном. На тёмном лесу эта кайма читается как обводка из
+    фотошопа. Лечится в два шага: срезаем крайние пиксели (вместе с грязью) и
+    растушёвываем оставшийся край, чтобы он не был бритвенно резким.
+    """
+    a = person.split()[3]
+    if erode:
+        a = a.filter(ImageFilter.MinFilter(2 * erode + 1))
+    if feather:
+        a = a.filter(ImageFilter.GaussianBlur(feather))
+    out = person.copy(); out.putalpha(a)
     return out
+
+
+def _match_colors(person: Image.Image, scene: Image.Image, strength: float = 0.28) -> Image.Image:
+    """Подгоняет человека под сцену по КАЖДОМУ каналу: среднее и контраст.
+
+    Раньше правилась только общая яркость, поэтому студийный нейтральный свет
+    оставался холоднее и контрастнее пасмурного леса — глаз читал наклейку.
+    Тянем и цвет, и разброс, но лишь наполовину: полное выравнивание убивает
+    объём лица.
+    """
+    import numpy as np
+    ref = scene.crop((0, scene.height // 3, scene.width, scene.height))
+    ref_a = np.asarray(ref.convert("RGB")).astype(np.float32).reshape(-1, 3)
+    rgb = np.asarray(person.convert("RGB")).astype(np.float32)
+    alpha = np.asarray(person.split()[3]).astype(np.float32) / 255.0
+    mask = alpha > 0.5
+    if mask.sum() < 100:
+        return person
+    out = rgb.copy()
+    for c in range(3):
+        p_vals = rgb[..., c][mask]
+        p_mean, p_std = p_vals.mean(), max(p_vals.std(), 1.0)
+        s_mean, s_std = ref_a[:, c].mean(), max(ref_a[:, c].std(), 1.0)
+        # тянем к сцене только на strength, и не даём контрасту уехать больше чем на 25%
+        # контраст правим слабо, цвет — ещё слабее: при сильной тяге чёрная
+        # спецовка уходила в коричневый под цвет леса
+        gain = 1 + (min(max(s_std / p_std, 0.85), 1.15) - 1) * strength
+        shift = (s_mean - p_mean) * strength * 0.30
+        out[..., c] = (rgb[..., c] - p_mean) * gain + p_mean + shift
+    res = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGB")
+    res.putalpha(person.split()[3])
+    return res
+
+
+def _match_texture(person: Image.Image, scene: Image.Image) -> Image.Image:
+    """Приводит резкость и зерно человека к сцене.
+
+    Фон снят камерой: у него есть шум и лёгкая нерезкость от глубины кадра.
+    Сгенерированный человек идеально чистый и звенящий — именно этот контраст
+    и выдаёт монтаж. Слегка размываем и подсыпаем шум под уровень сцены.
+    """
+    import numpy as np
+    band = np.asarray(scene.crop((0, scene.height // 3, scene.width,
+                                  scene.height)).convert("L")).astype(np.float32)
+    # оценка шума сцены: разница с медианно сглаженной версией
+    smooth = np.asarray(Image.fromarray(band.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(1.2))).astype(np.float32)
+    sigma = float(np.clip(np.std(band - smooth), 0.6, 6.0))
+
+    out = person.filter(ImageFilter.GaussianBlur(0.6))          # снимаем «звон»
+    arr = np.asarray(out.convert("RGB")).astype(np.float32)
+    noise = np.random.default_rng(7).normal(0.0, sigma, arr.shape[:2])[..., None]
+    arr = np.clip(arr + noise, 0, 255)
+    res = Image.fromarray(arr.astype(np.uint8), "RGB")
+    res.putalpha(out.split()[3])
+    return res
 
 
 def _face_height(person: Image.Image) -> float | None:
@@ -176,7 +234,9 @@ def compose(person_rgba: bytes, reference_bytes: bytes, anchor: dict,
         ratio = (scene.height * anchor.get("height", 0.55)) / person.height
     person = person.resize((max(1, int(person.width * ratio)), max(1, int(person.height * ratio))),
                            Image.LANCZOS)
+    person = _clean_edge(person)
     person = _match_colors(person, scene)
+    person = _match_texture(person, scene)
 
     px = int(scene.width * anchor.get("cx", 0.35) - person.width / 2)
     # Голова стоит там, где её ждёт анкер; низ уходит куда придётся — так кадр

@@ -167,6 +167,32 @@ def _face_height(person: Image.Image) -> float | None:
         return None
 
 
+def _grade(im: Image.Image) -> Image.Image:
+    """Единый плёночный грейд на ВЕСЬ кадр — человек и фон под одним светом.
+
+    На «Сахалине» кадр целиком рисовала модель по промпту с «cinematic colour
+    grade», и картинка выходила сочной. У нас фон берётся из эталона как есть,
+    поэтому сочность надо добавить самим — иначе кадр читается плоским рядом
+    с тем, что заказчик видел раньше. Работает и на человеке, и на фоне сразу:
+    это и связывает их в одну сцену.
+    """
+    import numpy as np
+    a = np.asarray(im.convert("RGB")).astype(np.float32) / 255.0
+    lum = a @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    a = lum[..., None] + (a - lum[..., None]) * config.GRADE_SATURATION
+    a = 0.020 + a * 0.968                                     # приподнятый чёрный
+    a = a + config.GRADE_CONTRAST * (a - 0.5) * (1 - np.abs(a - 0.5) * 2)
+    shadow = np.clip(1 - lum, 0, 1)[..., None]
+    a[..., 0] += 0.020 * (1 - shadow[..., 0])                 # света теплее
+    a[..., 2] += 0.016 * shadow[..., 0]                       # тени холоднее
+    H, W = a.shape[:2]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    r = np.sqrt(((xx / W - .5) * 2) ** 2 + ((yy / H - .5) * 2) ** 2) / 1.414
+    a *= (1 - config.GRADE_VIGNETTE * np.clip(r, 0, 1) ** 2)[..., None]
+    out = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8), "RGB")
+    return out.filter(ImageFilter.UnsharpMask(radius=1.4, percent=45, threshold=3))
+
+
 def _frame_on_person(scene: Image.Image, box: tuple[int, int, int, int],
                      fill: float | None = None, frame_cx: float | None = None) -> Image.Image:
     """Кадрирует сцену вокруг вклеенной фигуры — как если бы фотограф подошёл ближе.
@@ -261,6 +287,8 @@ def compose(person_rgba: bytes, reference_bytes: bytes, anchor: dict,
     out.alpha_composite(person, (px, py))
 
     out = _frame_on_person(out.convert("RGB"), (px, py, person.width, person.height), fill, frame_cx)
+    if config.GRADE_ENABLED:
+        out = _grade(out)
     buf = io.BytesIO()
     out.save(buf, format="JPEG", quality=93)
     return buf.getvalue()

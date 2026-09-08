@@ -138,6 +138,14 @@ CARD_FILL = float(os.environ.get("CARD_FILL", "0.66"))
 # фигура: так размер лица не зависит от того, обрезала модель ноги или нет.
 # 0.13 — с запасом над порогом отбраковки FRAME_MIN_FACE=0.10.
 TARGET_FACE = float(os.environ.get("TARGET_FACE", "0.13"))
+
+# Плёночный грейд на готовый кадр. На «Сахалине» сочность давала сама модель
+# (там кадр рисовался целиком по промпту с cinematic colour grade); у нас фон
+# берётся из эталона нетронутым, поэтому цвет вытягиваем сами.
+GRADE_ENABLED = os.environ.get("GRADE", "1").strip() in ("1", "true", "yes")
+GRADE_SATURATION = float(os.environ.get("GRADE_SATURATION", "1.14"))
+GRADE_CONTRAST = float(os.environ.get("GRADE_CONTRAST", "0.22"))
+GRADE_VIGNETTE = float(os.environ.get("GRADE_VIGNETTE", "0.10"))
 # Какая доля роста остаётся в кадре, считая от макушки: 0.62 — поясной портрет
 # со срезом по бедру. Меньше — крупнее лицо, но теряется поза и фон.
 CARD_PERSON_PART = float(os.environ.get("CARD_PERSON_PART", "0.62"))

@@ -93,7 +93,7 @@ def _match_colors(person: Image.Image, scene: Image.Image, strength: float = 0.3
 
 
 def _frame_on_person(scene: Image.Image, box: tuple[int, int, int, int],
-                     fill: float | None = None) -> Image.Image:
+                     fill: float | None = None, frame_cx: float | None = None) -> Image.Image:
     """Кадрирует сцену вокруг вклеенной фигуры — как если бы фотограф подошёл ближе.
 
     Зачем: у фигуры в полный рост голова занимает ~1/7 кадра, и лицо на карточке
@@ -123,13 +123,16 @@ def _frame_on_person(scene: Image.Image, box: tuple[int, int, int, int],
 
     # воздух над головой больше, чем под срезом: так кадр не выглядит обрубленным
     above = (crop_h - visible) * 0.8
-    x0 = min(max(px + pw / 2 - crop_w / 2, 0), max(W - crop_w, 0))
+    # По умолчанию кадр центрируется на госте. frame_cx сдвигает его к технике:
+    # иначе машина, стоящая сбоку от гостя, уезжает за край.
+    center = (px + pw / 2) if frame_cx is None else (W * frame_cx)
+    x0 = min(max(center - crop_w / 2, 0), max(W - crop_w, 0))
     y0 = 0 if fill <= 0 else min(max(py - above, 0), max(H - crop_h, 0))
     return scene.crop((round(x0), round(y0), round(x0 + crop_w), round(y0 + crop_h)))
 
 
 def compose(person_rgba: bytes, reference_bytes: bytes, anchor: dict,
-            fill: float | None = None) -> bytes:
+            fill: float | None = None, frame_cx: float | None = None) -> bytes:
     """Вклеивает вырезанного человека в эталон по анкеру.
     anchor: cx (0..1 центр по X), bottom (0..1 низ ног), height (0..1 рост от высоты кадра)."""
     scene = ImageOps.exif_transpose(Image.open(io.BytesIO(reference_bytes))).convert("RGB")
@@ -161,7 +164,7 @@ def compose(person_rgba: bytes, reference_bytes: bytes, anchor: dict,
     out.alpha_composite(shadow)
     out.alpha_composite(person, (px, py))
 
-    out = _frame_on_person(out.convert("RGB"), (px, py, person.width, person.height), fill)
+    out = _frame_on_person(out.convert("RGB"), (px, py, person.width, person.height), fill, frame_cx)
     buf = io.BytesIO()
     out.save(buf, format="JPEG", quality=93)
     return buf.getvalue()
@@ -170,7 +173,7 @@ def compose(person_rgba: bytes, reference_bytes: bytes, anchor: dict,
 def generate_composite(face_png: bytes, body_png: bytes, reference_bytes: bytes,
                        outfit: str, anchor: dict, light: str = "",
                        who: str = "", scale: float = 1.0,
-                       fill: float | None = None) -> bytes | None:
+                       fill: float | None = None, frame_cx: float | None = None) -> bytes | None:
     """Полный цикл одного варианта: человек → вырезка → вклейка в эталон.
 
     light — описание света сцены из locations.json; пусто → DEFAULT_LIGHT.
@@ -188,4 +191,4 @@ def generate_composite(face_png: bytes, body_png: bytes, reference_bytes: bytes,
     cut = _remove_bg(person)
     if not cut:
         return None
-    return compose(cut, reference_bytes, anchor, fill)
+    return compose(cut, reference_bytes, anchor, fill, frame_cx)

@@ -323,7 +323,8 @@ def _generate_sync(loc: dict, guest_bytes: bytes, outfit: str):
             out = person_composite.generate_composite(
                 face_png, body_png, reference,
                 outfits[i % len(outfits)], loc.get("anchor", {}), loc.get("light", ""),
-                who=who, scale=scale, fill=loc.get("frame_fill"))
+                who=who, scale=scale, fill=loc.get("frame_fill"),
+                frame_cx=loc.get("frame_cx"))
             if out:
                 variants.append(out)
         if not variants:

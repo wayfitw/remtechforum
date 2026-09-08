@@ -92,6 +92,23 @@ def _match_colors(person: Image.Image, scene: Image.Image, strength: float = 0.3
     return out
 
 
+def _face_height(person: Image.Image) -> float | None:
+    """Высота лица на вырезке, px. None — если лица не видно."""
+    import io as _io
+    flat = Image.new("RGB", person.size, (255, 255, 255))
+    flat.paste(person, mask=person.split()[3])
+    buf = _io.BytesIO(); flat.save(buf, format="JPEG", quality=92)
+    try:
+        import face_metric
+        faces = face_metric._faces(buf.getvalue())
+        if not faces:
+            return None
+        f = face_metric._largest(faces)
+        return float(f.bbox[3] - f.bbox[1])
+    except Exception:  # noqa: BLE001 — детектор недоступен, работаем по росту
+        return None
+
+
 def _frame_on_person(scene: Image.Image, box: tuple[int, int, int, int],
                      fill: float | None = None, frame_cx: float | None = None) -> Image.Image:
     """Кадрирует сцену вокруг вклеенной фигуры — как если бы фотограф подошёл ближе.
@@ -139,29 +156,48 @@ def compose(person_rgba: bytes, reference_bytes: bytes, anchor: dict,
     person = Image.open(io.BytesIO(person_rgba)).convert("RGBA")
 
     # обрезаем прозрачные поля вокруг человека
-    bbox = person.split()[3].getbbox()
-    if bbox:
-        person = person.crop(bbox)
+    alpha_bbox = person.split()[3].getbbox()
+    # Модель примерно в половине случаев обрезает ноги (замер 08.09.2026: 9 из 21
+    # вырезок упирались в нижний край). Такую фигуру нельзя ставить «ногами» на
+    # землю: срез оказывается на уровне земли, и человек выглядит обрубленным.
+    legs_cropped = bool(alpha_bbox) and alpha_bbox[3] >= person.height - 2
+    if alpha_bbox:
+        person = person.crop(alpha_bbox)
 
-    target_h = int(scene.height * anchor.get("height", 0.55))
-    ratio = target_h / person.height
-    person = person.resize((int(person.width * ratio), target_h), Image.LANCZOS)
+    # Масштаб задаём по ЛИЦУ, а не по росту вырезки. Иначе он скачет: модель то
+    # рисует фигуру целиком, то обрезает по бедро, и один и тот же анкер даёт
+    # разное лицо — замер 08.09.2026: 0.077 у целой фигуры против 0.113 у
+    # обрезанной, то есть половина кадров уходила бы в брак по размеру лица.
+    top = anchor.get("bottom", 0.96) - anchor.get("height", 0.55)   # где стоит макушка
+    face_h = _face_height(person)
+    if face_h:
+        ratio = (scene.height * anchor.get("face", config.TARGET_FACE)) / face_h
+    else:
+        ratio = (scene.height * anchor.get("height", 0.55)) / person.height
+    person = person.resize((max(1, int(person.width * ratio)), max(1, int(person.height * ratio))),
+                           Image.LANCZOS)
     person = _match_colors(person, scene)
 
     px = int(scene.width * anchor.get("cx", 0.35) - person.width / 2)
-    py = int(scene.height * anchor.get("bottom", 0.96) - person.height)
-
-    # мягкая контактная тень под ногами
-    shadow = Image.new("RGBA", scene.size, (0, 0, 0, 0))
-    sw, sh = int(person.width * 0.85), max(14, int(person.height * 0.05))
-    ell = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
-    from PIL import ImageDraw
-    ImageDraw.Draw(ell).ellipse([0, 0, sw, sh], fill=(10, 10, 10, 110))
-    ell = ell.filter(ImageFilter.GaussianBlur(6))
-    shadow.paste(ell, (px + (person.width - sw) // 2, py + person.height - sh // 2), ell)
+    # Голова стоит там, где её ждёт анкер; низ уходит куда придётся — так кадр
+    # выглядит одинаково независимо от того, целую фигуру нарисовала модель или
+    # обрезанную. Обрезанную дополнительно уводим за нижний край, чтобы срез не
+    # оказался посреди земли.
+    py = int(scene.height * top)
+    if legs_cropped:
+        py = max(py, int(scene.height * 1.04) - person.height)
 
     out = scene.convert("RGBA")
-    out.alpha_composite(shadow)
+    if not legs_cropped:
+        # мягкая контактная тень под ногами — только если ноги действительно есть
+        shadow = Image.new("RGBA", scene.size, (0, 0, 0, 0))
+        sw, sh = int(person.width * 0.85), max(14, int(person.height * 0.05))
+        ell = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
+        from PIL import ImageDraw
+        ImageDraw.Draw(ell).ellipse([0, 0, sw, sh], fill=(10, 10, 10, 110))
+        ell = ell.filter(ImageFilter.GaussianBlur(6))
+        shadow.paste(ell, (px + (person.width - sw) // 2, py + person.height - sh // 2), ell)
+        out.alpha_composite(shadow)
     out.alpha_composite(person, (px, py))
 
     out = _frame_on_person(out.convert("RGB"), (px, py, person.width, person.height), fill, frame_cx)

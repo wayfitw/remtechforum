@@ -109,7 +109,13 @@ def _frame_on_person(scene: Image.Image, box: tuple[int, int, int, int],
     W, H = scene.size
     visible = ph * config.CARD_PERSON_PART          # от макушки до среза по бедру
     fill = config.CARD_FILL if fill is None else fill
-    crop_h = min(H, visible / max(fill, 0.1))
+    if fill <= 0:
+        # «Камера дальше»: кадр берётся во всю высоту эталона и не зависит от
+        # фигуры. Размер гостя задаёт анкер — так техника за спиной остаётся
+        # такой же крупной, как на самом эталоне.
+        crop_h = H
+    else:
+        crop_h = min(H, visible / max(fill, 0.1))
     crop_w = crop_h * config.CARD_ASPECT
     if crop_w > W:                                  # сцена уже нужного — упираемся в ширину
         crop_w = W
@@ -118,7 +124,7 @@ def _frame_on_person(scene: Image.Image, box: tuple[int, int, int, int],
     # воздух над головой больше, чем под срезом: так кадр не выглядит обрубленным
     above = (crop_h - visible) * 0.8
     x0 = min(max(px + pw / 2 - crop_w / 2, 0), max(W - crop_w, 0))
-    y0 = min(max(py - above, 0), max(H - crop_h, 0))
+    y0 = 0 if fill <= 0 else min(max(py - above, 0), max(H - crop_h, 0))
     return scene.crop((round(x0), round(y0), round(x0 + crop_w), round(y0 + crop_h)))
 
 

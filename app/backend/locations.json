@@ -79,7 +79,8 @@
     ],
     "card_footer": "«Ремтехника» · ExpoDrev Russia 26 · Красноярск",
     "light": "bright clear summer daylight on an open mountain viewpoint, sun from above and slightly behind, light haze, no warm sunset cast.",
-    "outfit": "casual"
+    "outfit": "casual",
+    "mode": "edit"
   },
   "bear": {
     "id": "bear",
@@ -98,6 +99,7 @@
       "Сибирь близко."
     ],
     "card_footer": "«Ремтехника» · ExpoDrev Russia 26 · Красноярск",
-    "light": "warm golden-hour sunset light coming from BEHIND the person through the trees — a strong amber rim light along the shoulders, head and arms, the front of the body in soft warm shade, long low sun, no flat frontal daylight."
+    "light": "warm golden-hour sunset light coming from BEHIND the person through the trees — a strong amber rim light along the shoulders, head and arms, the front of the body in soft warm shade, long low sun, no flat frontal daylight.",
+    "mode": "composite"
   }
 }

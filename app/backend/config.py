@@ -45,16 +45,19 @@ VARIANTS = int(os.environ.get("VARIANTS", "3"))
 # Кепка, а не каска — решение заказчика от 02.09.2026.
 _WORKWEAR_OUTFIT = (
     'the official Remtehnika work jacket exactly as on the reference shots: a black work jacket with '
-    'bright yellow panels down the sides and on the forearms, grey retroreflective stripes across the '
-    'sleeves, and on the left chest a yellow rectangular badge with the black lowercase letters "rt" '
-    'and, directly below it, the small Cyrillic line «ООО РЕМТЕХНИКА» in dark capitals. IMAGE 4 IS THE '
-    'OFFICIAL BRAND LOGO — reproduce it EXACTLY as in image 4 on that chest badge and on the front of '
-    'the headwear: a yellow plate with cut corners and the black letters "rt" inside. On the head a '
-    'BLACK BASEBALL CAP with a curved peak carrying the same logo — a cap, never a hard hat. Keep the '
-    'identical shapes, proportions and colours of the logo, scaled to the garment and following the '
-    'folds of the fabric and the curve of the cap; do not redraw, restyle or invent a different emblem, '
-    'do not add any other lettering, and do not use image 4 anywhere else. Black work gloves, dark work '
-    'trousers. The workwear is clean and well fitted, not worn or dirty'
+    'bright yellow panels down the sides and on the forearms, and grey retroreflective stripes across '
+    'the sleeves. CHEST BADGE: on the left chest a rectangular patch outlined by a thin yellow line, '
+    'holding a yellow plate with cut corners and the black lowercase letters "rt" inside it and, '
+    'directly BELOW that plate, the small Cyrillic line «ООО РЕМТЕХНИКА» in dark capitals, crisp, '
+    'correctly spelled and legible. IMAGE 4 IS THE OFFICIAL BRAND LOGO — reproduce that yellow plate '
+    'EXACTLY as in image 4. CAP: on the head a BLACK BASEBALL CAP with a curved peak — a cap, never a '
+    'hard hat — carrying the SAME "rt" letterforms from image 4, but printed in BRIGHT YELLOW '
+    'DIRECTLY ON THE BLACK FABRIC of the cap front: NO yellow plate behind the letters there and NO '
+    'lettering under them. In both places the letterforms, their proportions and the two brand colours '
+    'are identical to image 4, following the folds of the fabric and the curve of the cap. Do not '
+    'redraw, restyle or invent a different emblem, add no other prints or lettering anywhere on the '
+    'clothing, and do not use image 4 anywhere else. Black work gloves, dark work trousers. The '
+    'workwear is clean and well fitted, not worn or dirty'
 )
 # Городской образ для площадок «не про работу» (Столбы): те же джинсы и худи,
 # что на согласованных кадрах. Спецовка там смотрится нелепо — человек приехал
@@ -123,6 +126,10 @@ FACE_ENHANCE_ENABLED = os.environ.get("FACE_ENHANCE", "0").strip() in ("1", "tru
 # Доработка после свапа: лёгкий GFPGAN-блендинг (красивее кожа, сходство почти держится).
 SWAP_REFINE_ENABLED = os.environ.get("SWAP_REFINE", "0").strip() in ("1", "true", "yes")
 SWAP_REFINE_ALPHA = float(os.environ.get("SWAP_REFINE_ALPHA", "0.3"))  # доля GFPGAN в бленде
+# Диффузионный свап вторым проходом nano-banana: переносит лицо в ПОЛНОМ разрешении,
+# без 128px-горлышка inswapper, поэтому кожа не восковая. Стоит как ещё один кадр,
+# поэтому по умолчанию выключен.
+NANO_SWAP_ENABLED = os.environ.get("NANO_SWAP", "0").strip() in ("1", "true", "yes")
 # Резкость после свапа (unsharp): чётче контуры губ/лица, идентичность не страдает.
 SWAP_SHARPEN_ENABLED = os.environ.get("SWAP_SHARPEN", "0").strip() in ("1", "true", "yes")
 SWAP_SHARPEN_PERCENT = int(os.environ.get("SWAP_SHARPEN_PERCENT", "70"))

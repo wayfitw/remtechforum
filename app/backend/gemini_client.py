@@ -109,6 +109,15 @@ def _one_variant(prompt: str, guest_png: bytes, reference: Optional[bytes],
                 if config.SWAP_REFINE_ENABLED:
                     refined = replicate_client.refine_swap(swapped, config.SWAP_REFINE_ALPHA)
                     swapped = refined or swapped
+                # диффузионный свап вторым проходом: лицо переносится в полном
+                # разрешении, поэтому уходит «восковость» от 128px inswapper.
+                if config.NANO_SWAP_ENABLED:
+                    nano = replicate_client.nano_face_swap(swapped, swap_face or guest_png)
+                    if nano:
+                        swapped = nano
+                        print("[nano-swap] применён")
+                    else:
+                        print("[nano-swap] НЕ применён — остаётся кадр после inswapper")
                 # резкость: чётче контуры губ/лица, лицо не перерисовывается
                 if config.SWAP_SHARPEN_ENABLED:
                     sharp = replicate_client.sharpen_result(swapped, config.SWAP_SHARPEN_PERCENT)

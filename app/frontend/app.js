@@ -23,7 +23,11 @@ function resetState() {
 function resetIdle() {
   clearTimeout(idleTimer);
   const cur = document.querySelector('.screen.active')?.dataset.screen;
-  if (['welcome', 'loading', 'done'].includes(cur)) return;
+  // Экраны с результатом по таймеру НЕ сбрасываются: гость смотрит свои кадры
+  // и карточку столько, сколько нужно, и уходит с них только сам — кнопкой
+  // «Готово». Раньше через 90 с киоск возвращался к началу и стирал варианты,
+  // и это читалось как «фотографии пропали».
+  if (['welcome', 'loading', 'done', 'variants', 'card'].includes(cur)) return;
   idleTimer = setTimeout(() => show('welcome'), 90000);
 }
 ['click', 'touchstart'].forEach(e => document.addEventListener(e, resetIdle));
@@ -310,7 +314,10 @@ function printFromDevice() {
   setTimeout(finish, 10000);
   window.print();
 }
-$('#finish').addEventListener('click', finishFlow);
+// «Готово» возвращает прямо на начальный экран, без промежуточного финала:
+// гость уже всё увидел и забрал. Экран «Готово!» остаётся для печати — там
+// важно сообщить, что карточку нужно взять у стенда.
+$('#finish').addEventListener('click', () => show('welcome'));
 
 function finishFlow() {
   show('done');

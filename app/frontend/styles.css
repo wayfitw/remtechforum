@@ -338,33 +338,10 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
 /* Овал крупнее и опущен ниже: при 52%/42% подбородок и губы оказывались на самой
    границе, гость подавался назад — и в кадр попадало мелкое лицо. Теперь нижний
    край овала на 78% высоты кадра, рот заведомо внутри. */
-/* Подсказка «лицо сюда»: тонкий сплошной овал, затемнение вокруг едва заметное.
-   Овал не кадрирует — снимок режется по рамке 3:4, — но заставляет гостя подойти
-   ближе, а от этого зависит, пройдёт ли кадр гейт по размеру лица (200 px).
-   Прежний вариант с пунктиром и маской на 45% съедал половину картинки, и гость
-   плохо видел себя. Альтернативы включаются классом на .camera-wrap:
-   guide-bold (как было), guide-corners (уголки видоискателя), guide-none. */
-.face-guide{position:absolute; left:50%; top:45%; transform:translate(-50%,-50%);
-  width:66%; aspect-ratio:3/4; border:1.5px solid rgba(255,255,255,.55); border-radius:50%;
-  box-shadow:0 0 0 1000px rgba(0,0,0,.18); pointer-events:none; z-index:2;}
-
-.guide-bold .face-guide{
-  border:3px dashed rgba(255,255,255,.85);
-  box-shadow:0 0 0 1000px rgba(0,0,0,.45);
-}
-.guide-corners .face-guide{
-  width:70%; aspect-ratio:3/4; border:none; border-radius:0; box-shadow:none;
-  background:
-    linear-gradient(var(--rt-yellow),var(--rt-yellow)) left top/28px 3px no-repeat,
-    linear-gradient(var(--rt-yellow),var(--rt-yellow)) left top/3px 28px no-repeat,
-    linear-gradient(var(--rt-yellow),var(--rt-yellow)) right top/28px 3px no-repeat,
-    linear-gradient(var(--rt-yellow),var(--rt-yellow)) right top/3px 28px no-repeat,
-    linear-gradient(var(--rt-yellow),var(--rt-yellow)) left bottom/28px 3px no-repeat,
-    linear-gradient(var(--rt-yellow),var(--rt-yellow)) left bottom/3px 28px no-repeat,
-    linear-gradient(var(--rt-yellow),var(--rt-yellow)) right bottom/28px 3px no-repeat,
-    linear-gradient(var(--rt-yellow),var(--rt-yellow)) right bottom/3px 28px no-repeat;
-}
-.guide-none .face-guide{display:none;}
+/* Овал-подсказка убран по просьбе заказчика 12.09.2026: осталась только рамка
+   кадра 3:4. Вместе с овалом ушло и его легкое затемнение по краям, картинка стала
+   светлее. Просьба подойти ближе переехала в подпись под заголовком: от размера лица
+   зависит, пройдёт ли кадр гейт (200 px). */
 /* Размер задаём по ВЫСОТЕ: раньше кадр считался от ширины (min(70vw,540px)) и в
    ландшафте iPad вырастал до 720px — экран съёмки не помещался, кнопка «Снять»
    уезжала за край и была недоступна. Третий член min() страхует по ширине,

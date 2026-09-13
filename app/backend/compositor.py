@@ -94,7 +94,10 @@ def build_card(generated_png: bytes,
     photo_top = MARGIN
     logos_top = photo_top + photo_h + 54
     footer_y = logos_top + LOGO_H + FOOTER_GAP
-    card_h = footer_y + 96
+    # Нижнее поле подобрано так, чтобы карточка была ровно 1200x1800: это 4x6" (10x15 см)
+    # при 300 dpi, родной формат принтера DNP QW410 на форуме. При 1780 драйвер
+    # растягивал картинку или оставлял белую полоску.
+    card_h = footer_y + 116
 
     card = Image.new("RGB", (CARD_W, card_h), CARD_BG)
     draw = ImageDraw.Draw(card)

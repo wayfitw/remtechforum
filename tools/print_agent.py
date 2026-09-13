@@ -69,9 +69,22 @@ PHYSICALWIDTH, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY = 110, 111, 112,
 _reported: set[str] = set()   # по каким карточкам ошибку уже показали
 
 
+# Консоль Windows по умолчанию в кодировке cp1252/cp866, и print кириллицы
+# падал UnicodeEncodeError прямо на старте exe (проверено 13.09.2026, когда
+# вывод перенаправлен). Переводим вывод в UTF-8, непечатное заменяем.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+
 def log(msg: str) -> None:
     line = f"[{time.strftime('%d.%m %H:%M:%S')}] {msg}"
-    print(line, flush=True)
+    try:
+        print(line, flush=True)
+    except (UnicodeEncodeError, OSError):
+        pass                                # журнал в файле всё равно пишется
     try:
         with LOGFILE.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")

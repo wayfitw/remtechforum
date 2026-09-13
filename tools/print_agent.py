@@ -20,6 +20,10 @@
 
 Запуск из исходников: pip install requests pillow pywin32; python print_agent.py
 Сборка в один exe:    pyinstaller --onefile --name RemtehnikaPrint print_agent.py
+
+На Mac печать идёт через CUPS (lp) с официальным драйвером DNP: агент сам
+находит принтер, берёт у драйвера размер бумаги 4x6 и заполняет им лист.
+Запуск на Mac — start-mac.command рядом с программой.
 """
 from __future__ import annotations
 
@@ -65,6 +69,8 @@ TOLERANCE = 0.03          # допустимое расхождение проп
 # Коды GetDeviceCaps
 LOGPIXELSX, LOGPIXELSY = 88, 90
 PHYSICALWIDTH, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY = 110, 111, 112, 113
+
+IS_WINDOWS = platform.system() == "Windows"
 
 _reported: set[str] = set()   # по каким карточкам ошибку уже показали
 
@@ -166,11 +172,79 @@ def print_windows(printer: str, path: Path, output_file: str | None = None) -> N
         dc.DeleteDC()
 
 
-def print_cups(path: Path) -> None:
-    cmd = ["lp", "-o", "media=4x6", "-o", "fit-to-page"]
+# ---------------- macOS: печать через CUPS ----------------
+
+def _run(cmd: list[str]) -> str:
+    """Вывод команды CUPS. Язык принудительно английский: на русской macOS lpstat
+    пишет «принтер … простаивает», и разбор строк ломался бы."""
+    env = dict(os.environ, LC_ALL="C", LANG="C")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
+    return res.stdout
+
+
+def parse_lpstat_printers(text: str) -> list[str]:
+    return [line.split()[1] for line in text.splitlines()
+            if line.startswith("printer ") and len(line.split()) > 1]
+
+
+def parse_lpstat_default(text: str) -> str:
+    line = text.strip()
+    return line.rsplit(":", 1)[1].strip() if line.startswith("system default destination:") else ""
+
+
+def find_4x6(options: str) -> str | None:
+    """Имя размера 4x6 из вывода `lpoptions -l`. Драйверы называют его по-разному:
+    w288h432 (4x6 дюйма в пунктах), 4x6, PC4x6, 102x152 — ищем любое из них."""
+    for line in options.splitlines():
+        key, _, values = line.partition(":")
+        if key.split("/")[0].strip() not in ("PageSize", "media"):
+            continue
+        for value in values.split():
+            name = value.lstrip("*")
+            low = name.lower()
+            if any(mark in low for mark in ("4x6", "w288h432", "102x152")):
+                return name
+    return None
+
+
+def pick_cups_printer() -> str:
+    names = parse_lpstat_printers(_run(["lpstat", "-p"]))
     if PRINTER:
-        cmd += ["-d", PRINTER]
-    subprocess.run(cmd + [str(path)], check=True, timeout=60)
+        if PRINTER not in names:
+            raise SystemExit(f"Принтер «{PRINTER}» не найден. Установленные: {', '.join(names) or 'нет'}")
+        return PRINTER
+    for mark in ("QW410", "DNP"):
+        for n in names:
+            if mark.lower() in n.lower():
+                return n
+    default = parse_lpstat_default(_run(["lpstat", "-d"]))
+    if not default:
+        raise SystemExit("Принтер не найден. Добавьте DNP QW410 в «Системных настройках → Принтеры "
+                         "и сканеры» и запустите программу снова.")
+    log(f"ВНИМАНИЕ: принтер DNP не найден, беру принтер по умолчанию «{default}». "
+        f"Установленные: {', '.join(names)}")
+    return default
+
+
+def cups_media_problem(printer: str) -> tuple[str | None, str | None]:
+    """(имя размера 4x6, None) или (None, текст, что исправить)."""
+    media = find_4x6(_run(["lpoptions", "-p", printer, "-l"]))
+    if media:
+        return media, None
+    return None, (f"у принтера «{printer}» в драйвере нет размера 4x6. Установите официальный "
+                  f"драйвер DNP для macOS и добавьте принтер заново.")
+
+
+def print_cups(printer: str, path: Path) -> None:
+    media, problem = cups_media_problem(printer)
+    if problem:
+        raise RuntimeError(problem)
+    # print-scaling=fill растягивает на весь лист без полей; пропорции карточки и
+    # листа 4x6 совпадают, поэтому ничего не обрезается.
+    cmd = ["lp", "-d", printer, "-o", f"PageSize={media}", "-o", "print-scaling=fill", str(path)]
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if res.returncode != 0:
+        raise RuntimeError(f"lp не принял задание: {(res.stderr or res.stdout).strip()}")
 
 
 # ---------------- очередь на сервере ----------------
@@ -188,7 +262,7 @@ def mark_done(card_id: str) -> None:
     r.raise_for_status()
 
 
-def handle(job: dict, printer: str | None) -> None:
+def handle(job: dict, printer: str) -> None:
     card = job["card_id"]
     DOWNLOADS.mkdir(exist_ok=True)
     dest = DOWNLOADS / card
@@ -200,11 +274,11 @@ def handle(job: dict, printer: str | None) -> None:
 
     if DRY_RUN:
         log(f"пробный режим: печать пропущена для {card}")
-    elif printer is not None:
+    elif IS_WINDOWS:
         print_windows(printer, dest)
         log(f"отправлено на принтер: {card}")
     else:
-        print_cups(dest)
+        print_cups(printer, dest)
         log(f"отправлено на принтер: {card}")
 
     # Подтверждаем ТОЛЬКО после успешной печати: иначе задание остаётся в очереди
@@ -214,9 +288,13 @@ def handle(job: dict, printer: str | None) -> None:
     log(f"задание закрыто: {card}")
 
 
-def self_check(printer: str | None) -> None:
+def self_check(printer: str) -> None:
     log(f"агент запущен · сайт {BASE}{' · ПРОБНЫЙ РЕЖИМ, без печати' if DRY_RUN else ''}")
-    if printer is not None:
+    if not IS_WINDOWS:
+        media, problem = cups_media_problem(printer)
+        log(f"принтер «{printer}» · размер бумаги {media or 'не найден'}")
+        log(f"ВНИМАНИЕ: {problem}" if problem else "размер бумаги подходит под карточку 10x15 см")
+    else:
         pw, ph, dx, dy = _caps(printer, PHYSICALWIDTH, PHYSICALHEIGHT, LOGPIXELSX, LOGPIXELSY)
         log(f"принтер «{printer}» · лист {round(pw / dx * 25.4)}x{round(ph / dy * 25.4)} мм · {dx} dpi")
         problem = paper_problem(printer, (1200, 1800))
@@ -228,7 +306,7 @@ def self_check(printer: str | None) -> None:
 def main() -> None:
     if not KEY:
         raise SystemExit("Не задан PRINT_QUEUE_KEY — впишите его в settings.txt рядом с программой.")
-    printer = pick_printer() if platform.system() == "Windows" else None
+    printer = pick_printer() if IS_WINDOWS else pick_cups_printer()
     self_check(printer)
     while True:
         try:

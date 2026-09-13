@@ -7,3 +7,6 @@ app/run.sh      text eol=lf
 
 # Windows-скрипты — CRLF
 *.bat           text eol=crlf
+
+# Скрипт запуска на Mac — только LF, иначе bash на macOS не запустит его
+*.command       text eol=lf

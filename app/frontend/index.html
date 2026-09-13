@@ -88,7 +88,7 @@
       <p class="sub">Подойдите ближе, чтобы лицо занимало большую часть кадра</p>
       <div class="camera-wrap">
         <video id="video" autoplay playsinline></video>
-        <div id="cam-error" class="cam-error hidden">Камера недоступна — загрузите фото ниже</div>
+        <div id="cam-error" class="cam-error hidden">Камера недоступна — загрузите фото с телефона</div>
       </div>
       <div class="row">
         <button class="btn-primary big" id="shoot"><span class="btn-ico">📸</span> Снять</button>
@@ -131,7 +131,7 @@
 
   <!-- 6. Карточка -->
   <section class="screen" data-screen="card">
-    <h2>Ваша фото-карточка</h2>
+    <h2>Ваша фотокарточка</h2>
     <div class="card-view">
       <img id="card-img" alt="карточка">
       <div class="card-side">
@@ -159,6 +159,9 @@
     <p class="sub" id="done-note">Заберите карточку у стенда «Ремтехника»</p>
     <p class="countdown">Возврат к началу через <span id="cd">8</span>…</p>
   </section>
+
+  <!-- Сообщение гостю поверх любого экрана (вместо системного alert) -->
+  <div id="notice" class="notice hidden" role="alert"></div>
 
 </div>
 <script src="app.js?v=__V__"></script>

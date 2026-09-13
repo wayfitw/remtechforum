@@ -1,6 +1,19 @@
 // AI-фотоинсталляция «Ремтехника» — киоск-флоу
 const state = { location: null, locationTitle: null, locationOutfit: 'workwear', outfit: 'male', variants: [], chosen: null, card: null };
 let stream = null, idleTimer = null, loadingElapsed = null, qrPoller = null;
+let loadingMode = 'gen';          // что показывает экран загрузки: 'gen' или 'card'
+
+// Сообщение гостю поверх экрана. Раньше ошибки показывал системный alert: на
+// iPad это серое окно с кнопкой «ОК» поверх киоска, и без касания оно висит.
+let noticeTimer = null;
+function notify(text) {
+  const el = document.getElementById('notice');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('hidden');
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => el.classList.add('hidden'), 7000);
+}
 
 const $ = (s) => document.querySelector(s);
 const screens = document.querySelectorAll('.screen');
@@ -16,7 +29,7 @@ function show(name) {
 }
 
 function resetState() {
-  state.location = state.chosen = state.card = null; state.variants = [];
+  state.location = state.chosen = state.card = state.cardFull = null; state.variants = [];
   resetEmailForm();
 }
 
@@ -77,19 +90,32 @@ function updateTopbar(screenName) {
 }
 
 // ─── Таймер загрузки ──────────────────────────────────────────
+// Режимы экрана загрузки. Раньше при сборке карточки крупный заголовок оставался
+// «Собираем ваш кадр…», а через секунду счётчик затирал строку про карточку
+// надписью «Идёт генерация». Полоса рассчитана на реальное время: два варианта
+// с переносом лица по журналам занимают до 150 с, а при 90 с полоса вставала
+// на 92% и последнюю минуту выглядела зависшей.
+const LOADING = {
+  gen:  { eyebrow: 'ИДЁТ ГЕНЕРАЦИЯ',    title: 'Собираем ваш кадр…', seconds: 150 },
+  card: { eyebrow: 'СОБИРАЕМ КАРТОЧКУ', title: 'Собираем карточку…', seconds: 8 },
+};
+
 function startLoadingTimer() {
+  const mode = LOADING[loadingMode] || LOADING.gen;
   let sec = 0;
   const timerEl = document.getElementById('loading-timer');
+  const titleEl = document.querySelector('.loading-title');
   const fillEl  = document.getElementById('loading-bar-fill');
 
+  if (titleEl) titleEl.textContent = mode.title;
+  if (timerEl) timerEl.textContent = mode.eyebrow;
   // Сброс прогресс-бара
   if (fillEl) { fillEl.style.transition = 'none'; fillEl.style.width = '0%'; }
-  if (timerEl) timerEl.textContent = 'ИДЁТ ГЕНЕРАЦИЯ';
 
   // Запускаем анимацию прогресс-бара через кадр (после сброса)
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (fillEl) {
-      fillEl.style.transition = 'width 90s linear';
+      fillEl.style.transition = `width ${mode.seconds}s linear`;
       fillEl.style.width = '92%';
     }
   }));
@@ -97,7 +123,7 @@ function startLoadingTimer() {
   stopLoadingTimer();
   loadingElapsed = setInterval(() => {
     sec++;
-    if (timerEl) timerEl.textContent = `ИДЁТ ГЕНЕРАЦИЯ · ПРОШЛО ${sec} СЕК`;
+    if (timerEl) timerEl.textContent = `${mode.eyebrow} · ПРОШЛО ${sec} СЕК`;
   }, 1000);
 }
 
@@ -136,7 +162,7 @@ document.querySelectorAll('.outfit').forEach(o =>
 // открыт по IP (браузер отдаёт камеру только на localhost и по HTTPS).
 function cameraProblem(err) {
   if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return 'Откройте киоск по адресу localhost — по IP браузер камеру не выдаёт';
+    return 'Камера работает только на защищённом адресе — откройте сайт через https://';
   }
   switch (err && err.name) {
     case 'NotFoundError':
@@ -208,6 +234,7 @@ $('#file').addEventListener('change', e => {
 // Держать один запрос открытым все ~2 минуты нельзя: сеть гостя может оборвать
 // его на 60-й секунде, и готовый кадр пропадал с «Failed to fetch».
 async function generate(blob) {
+  loadingMode = 'gen';
   show('loading');
   const fd = new FormData();
   fd.append('location', state.location);
@@ -223,8 +250,8 @@ async function generate(blob) {
     renderVariants();
     show('variants');
   } catch (e) {
-    alert('Не получилось сгенерировать: ' + e.message);
     show('capture');
+    notify('Не получилось сгенерировать. ' + e.message);
   }
 }
 
@@ -266,21 +293,24 @@ async function chooseVariant(v, imgEl) {
   document.querySelectorAll('.variants img').forEach(i => i.classList.remove('sel'));
   imgEl.classList.add('sel');
   state.chosen = v.id;
+  loadingMode = 'card';
   show('loading');
-  const timerEl = document.getElementById('loading-timer');
-  if (timerEl) timerEl.textContent = 'СОБИРАЕМ КАРТОЧКУ С ЛОГОТИПАМИ…';
   const fd = new FormData(); fd.append('variant_id', v.id);
   if (state.location) fd.append('location', state.location);
   try {
     const r = await fetch('/api/card', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error('card ' + r.status);
     const data = await r.json();
     state.card = data.card_id;
+    state.cardFull = data.card_url;
     resetEmailForm();
-    $('#card-img').src = data.card_url;
+    // на экран — лёгкое превью; полная карточка нужна только для печати
+    $('#card-img').src = data.card_preview_url || data.card_url;
     $('#qr-img').src = data.qr_url;
     show('card');
   } catch (e) {
-    alert('Ошибка сборки карточки'); show('variants');
+    show('variants');
+    notify('Не получилось собрать карточку. Выберите кадр ещё раз.');
   }
 }
 
@@ -313,7 +343,15 @@ $('#print').addEventListener('click', async () => {
 // скрывается правилами @media print в styles.css.
 function printFromDevice() {
   const img = document.getElementById('card-img');
-  if (!img || !img.getAttribute('src')) { alert('Карточка ещё не готова'); return; }
+  if (!img || !img.getAttribute('src')) { notify('Карточка ещё не готова'); return; }
+  // На экране превью; на бумагу должна уйти полная карточка. Подменяем картинку
+  // и печатаем, когда она догрузится.
+  if (state.cardFull && !img.src.endsWith(state.cardFull)) {
+    img.addEventListener('load', () => printFromDevice(), { once: true });
+    img.addEventListener('error', () => notify('Не удалось загрузить карточку для печати'), { once: true });
+    img.src = state.cardFull;
+    return;
+  }
   let done = false;
   const finish = () => {
     if (done) return;              // afterprint и таймер не должны сработать оба
@@ -379,9 +417,11 @@ document.getElementById('qr-upload-btn').addEventListener('click', async () => {
       } catch (_) {}
     }, 2000);
   } catch (e) {
-    alert('Не удалось создать сессию: ' + e.message);
+    notify('Не удалось показать QR-код. Попробуйте ещё раз.');
   }
 });
+
+document.getElementById('notice').addEventListener('click', e => e.currentTarget.classList.add('hidden'));
 
 document.getElementById('qr-cancel').addEventListener('click', () => {
   stopQrPoller();

@@ -446,9 +446,6 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
 /* ═══════════════════════════════════════
    ВАРИАНТЫ, КАРТОЧКА, ФИНАЛ
 ═══════════════════════════════════════ */
-.spinner{width:80px; height:80px; border:7px solid rgba(255,255,255,.15); border-top-color:var(--rt-yellow);
-  border-radius:50%; animation:spin 1s linear infinite; margin-bottom:24px;}
-@keyframes spin{to{transform:rotate(360deg);}}
 
 .variants{display:flex; gap:clamp(12px,2vw,22px); flex-wrap:wrap; justify-content:center;}
 /* тоже по высоте — иначе на низких экранах кадры вылезают за пределы */
@@ -566,3 +563,20 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
   flex-shrink:0; box-shadow:0 10px 30px rgba(0,0,0,.4);}
 .countdown{color:#7a7a84; margin-top:20px;}
 .hidden{display:none;}
+
+/* Сообщение гостю поверх экрана вместо системного alert */
+.notice{position:fixed; left:50%; z-index:50;
+  bottom:calc(var(--bar-bottom) + env(safe-area-inset-bottom, 0px) + 16px);
+  transform:translateX(-50%); max-width:min(92vw,560px);
+  padding:14px 20px; border-radius:14px; text-align:center;
+  background:#1c1c20; color:#fff; border:1.5px solid rgba(255,194,14,.55);
+  box-shadow:0 12px 34px rgba(0,0,0,.5); font-size:16px; line-height:1.4;
+  animation:fade .3s ease; cursor:pointer;}
+
+/* Щадящий режим: если в системе отключены анимации, экраны не выезжают,
+   надпись ожидания не мигает, полоса загрузки не ползёт. */
+@media (prefers-reduced-motion: reduce){
+  .screen,.notice,.qr-waiting{animation:none;}
+  .loading-bar-fill{transition:none !important;}
+  .btn-primary,.btn-email,.loc,.outfit,.variants img,.brand-mark{transition:none;}
+}

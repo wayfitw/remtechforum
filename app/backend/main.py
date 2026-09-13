@@ -121,6 +121,27 @@ def _save(data: bytes, name: str) -> str:
     return name
 
 
+# Превью для экрана. Кадр с модели весит около 3 МБ, карточка 2.4 МБ: на Wi-Fi
+# выставки они грузились по несколько секунд и прорисовывались построчно
+# (замер 14.09.2026). Экрану хватает JPEG до 1100 px, это в разы легче.
+# Полноразмерные PNG остаются для печати, почты и цифровой версии по QR.
+# Префикс view_ — чтобы превью не попадали под маски card_* и gen_*.
+PREVIEW_MAX_SIDE = 1100
+
+
+def _save_preview(data: bytes, name: str) -> str:
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(data)).convert("RGB")
+        img.thumbnail((PREVIEW_MAX_SIDE, PREVIEW_MAX_SIDE), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=84, optimize=True, progressive=True)
+        return _save(buf.getvalue(), "view_" + name.rsplit(".", 1)[0] + ".jpg")
+    except Exception as exc:  # noqa: BLE001 — без превью экран покажет полный файл
+        print(f"[preview] не удалось для {name}: {exc!r}")
+        return name
+
+
 # ---------------- API ----------------
 
 @app.get("/api/health")
@@ -328,7 +349,7 @@ def _generate_sync(loc: dict, guest_bytes: bytes, outfit: str):
             if out:
                 variants.append(out)
         if not variants:
-            raise HTTPException(502, "Генерация не удалась (composite). Попробуйте ещё раз.")
+            raise HTTPException(502, "Не удалось сгенерировать кадр. Попробуйте ещё раз.")
 
         # Перенос настоящего лица гостя на готовый кадр. Замер 06.09.2026 на
         # имитациях кадров с вебки: сходство 0.697 → 0.799, восковых лиц нет.
@@ -401,7 +422,9 @@ def _generate_sync(loc: dict, guest_bytes: bytes, outfit: str):
     for i, data in enumerate(variants):
         name = f"gen_{session_id}_{i}.png"
         _save(data, name)
-        out.append({"id": name, "url": f"/files/{name}", "similarity": sims[i] if i < len(sims) else None})
+        view = _save_preview(data, name)
+        out.append({"id": name, "url": f"/files/{view}", "full_url": f"/files/{name}",
+                    "similarity": sims[i] if i < len(sims) else None})
 
     return {"session": session_id, "location": loc["title"], "variants": out,
             "stub_mode": config.STUB_MODE}
@@ -418,6 +441,7 @@ def make_card(variant_id: str = Form(...), location: str = Form("")):
                                  footer=loc.get("card_footer", ""))
     card_id = f"card_{uuid.uuid4().hex[:8]}.png"
     _save(card, card_id)
+    card_view = _save_preview(card, card_id)
 
     # QR на цифровую версию
     qr_url = f"{config.PUBLIC_BASE_URL}/d/{card_id}"
@@ -427,6 +451,7 @@ def make_card(variant_id: str = Form(...), location: str = Form("")):
     _save(qbuf.getvalue(), qr_id)
 
     return {"card_id": card_id, "card_url": f"/files/{card_id}",
+            "card_preview_url": f"/files/{card_view}",
             "qr_url": f"/files/{qr_id}", "digital_url": qr_url}
 
 
@@ -558,7 +583,9 @@ def send_email_card(card_id: str = Form(...), email: str = Form(...)):
     try:
         result = email_client.send_card(email, path)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(500, f"Ошибка отправки письма: {exc}")
+        # Текст исключения нужен журналу; гостю на экране он ничего не говорит.
+        print(f"[email] сбой отправки: {exc!r}")
+        return {"sent": False, "reason": "Не удалось отправить письмо. Заберите карточку по QR-коду."}
     return result
 
 
@@ -587,7 +614,8 @@ def print_card(card_id: str = Form(...)):
         try:
             subprocess.run(cmd, check=True, capture_output=True, timeout=30)
         except Exception as exc:  # noqa: BLE001
-            raise HTTPException(500, f"Ошибка печати: {exc}")
+            print(f"[print] сбой lpr: {exc!r}")
+            raise HTTPException(500, "Не удалось отправить карточку на печать")
         return {"printed": True, "printer": config.PRINT_PRINTER or "default"}
 
     _queue_marker(path.name).write_text(str(time.time()), encoding="utf-8")

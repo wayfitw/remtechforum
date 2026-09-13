@@ -17,6 +17,20 @@ function show(name) {
 
 function resetState() {
   state.location = state.chosen = state.card = null; state.variants = [];
+  resetEmailForm();
+}
+
+// Форма почты привязана к конкретной карточке. Раньше статус «Письмо отправлено»
+// оставался на экране, когда гость переходил к другой карточке, и выглядел так,
+// будто её тоже уже отправили. Сбрасываем при каждом показе новой карточки и при
+// возврате на старт; адрес тоже стираем — следующая карточка может быть чужой.
+function resetEmailForm() {
+  const status = document.getElementById('email-status');
+  const input  = document.getElementById('email-input');
+  const btn    = document.getElementById('send-email');
+  if (status) { status.textContent = ''; status.className = 'email-status'; }
+  if (input) input.value = '';
+  if (btn) btn.disabled = false;
 }
 
 // ─── Авто-сброс по бездействию ────────────────────────────────
@@ -261,6 +275,7 @@ async function chooseVariant(v, imgEl) {
     const r = await fetch('/api/card', { method: 'POST', body: fd });
     const data = await r.json();
     state.card = data.card_id;
+    resetEmailForm();
     $('#card-img').src = data.card_url;
     $('#qr-img').src = data.qr_url;
     show('card');
@@ -395,13 +410,17 @@ document.getElementById('send-email').addEventListener('click', async () => {
   btn.disabled = true;
   status.className = 'email-status';
   status.textContent = 'Отправляем…';
+  // Ответ почты может прийти, когда гость уже открыл другую карточку. Тогда
+  // результат относится к старой и на новый экран его писать нельзя.
+  const cardAtSend = state.card;
 
   try {
     const fd = new FormData();
-    fd.append('card_id', state.card);
+    fd.append('card_id', cardAtSend);
     fd.append('email', email);
     const r = await fetch('/api/send-email', { method: 'POST', body: fd });
     const data = await r.json();
+    if (state.card !== cardAtSend) return;
     if (data.sent) {
       status.textContent = '✓ Письмо отправлено!';
       input.value = '';
@@ -410,6 +429,7 @@ document.getElementById('send-email').addEventListener('click', async () => {
       status.className = 'email-status error';
     }
   } catch (_) {
+    if (state.card !== cardAtSend) return;
     status.textContent = 'Ошибка соединения';
     status.className = 'email-status error';
   } finally {

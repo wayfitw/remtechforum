@@ -10,16 +10,51 @@ import io
 
 from PIL import Image, ImageOps
 
-# opencv может быть недоступен/битый — тогда работаем без детекции лица (центр-кроп)
+# opencv нужен для выравнивания света (deshadow). Детектор Хаара — отдельно:
+# в OpenCV 5 класса CascadeClassifier и xml-файлов каскадов больше нет, и раньше
+# его падение обнуляло весь cv2. Итог (13.09.2026): deshadow молча не работал, а
+# кроп лица всегда уходил в запасной вариант «верхняя половина кадра» и резал
+# лицо по нос — модель не видела рот, щёки и челюсть и дорисовывала их опухшими.
 try:
     import numpy as np
     import cv2
-    _CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    if _CASCADE.empty():
-        _CASCADE = None
 except Exception:  # noqa: BLE001
+    np = None
     cv2 = None
-    _CASCADE = None
+
+_CASCADE = None
+if cv2 is not None and hasattr(cv2, "CascadeClassifier"):
+    try:
+        _CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        if _CASCADE.empty():
+            _CASCADE = None
+    except Exception:  # noqa: BLE001
+        _CASCADE = None
+
+
+def _face_box(img: Image.Image):
+    """Рамка самого крупного лица (x, y, w, h) или None.
+
+    Основной детектор — insightface: он уже загружен для входного контроля и
+    работает на любой версии OpenCV. Хаар — только запасной, если insightface
+    недоступен."""
+    try:
+        import face_metric  # ленивый импорт: модуль тяжёлый и тянет config
+        buf = io.BytesIO(); img.save(buf, format="JPEG", quality=95)
+        face = face_metric._largest(face_metric._faces(buf.getvalue()))
+        if face is not None:
+            x1, y1, x2, y2 = (float(v) for v in face.bbox)
+            return x1, y1, x2 - x1, y2 - y1
+    except Exception as exc:  # noqa: BLE001
+        print(f"[facecrop] insightface недоступен: {exc}")
+    if _CASCADE is not None:
+        W, H = img.size
+        gray = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
+        faces = _CASCADE.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=5,
+                                          minSize=(int(min(W, H) * 0.06), int(min(W, H) * 0.06)))
+        if len(faces):
+            return tuple(float(v) for v in max(faces, key=lambda f: f[2] * f[3]))
+    return None
 
 
 def deshadow(image_bytes: bytes, clip: float = 2.0) -> bytes | None:
@@ -100,13 +135,9 @@ def crops(image_bytes: bytes) -> tuple[bytes, bytes]:
     img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
     W, H = img.size
 
-    faces = []
-    if _CASCADE is not None:
-        gray = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
-        faces = _CASCADE.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=5,
-                                          minSize=(int(min(W, H) * 0.06), int(min(W, H) * 0.06)))
-    if len(faces):
-        x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+    box = _face_box(img)
+    if box is not None:
+        x, y, w, h = box
         cx, cy = x + w / 2, y + h / 2
         # 1) крупное лицо: теснее кадрируем (лицо крупнее в референсе → выше сходство)
         fw = max(w * 1.7, 512 if W >= 512 else W)
@@ -135,15 +166,10 @@ def crop_to_face(image_bytes: bytes) -> bytes:
     img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
     W, H = img.size
 
-    faces = []
-    if _CASCADE is not None:
-        gray = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
-        faces = _CASCADE.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=5,
-                                          minSize=(int(min(W, H) * 0.06), int(min(W, H) * 0.06)))
-
-    if len(faces):
+    box = _face_box(img)
+    if box is not None:
         # самое крупное лицо
-        x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+        x, y, w, h = box
         cx, cy = x + w / 2, y + h / 2
         # рамка «по пояс»: модель должна ВИДЕТЬ телосложение гостя, иначе выдумает его.
         # Лицо — в верхней четверти кадра, ниже — плечи/грудь/талия.

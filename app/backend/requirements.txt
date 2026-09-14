@@ -6,7 +6,9 @@ python-multipart
 qrcode[pil]
 replicate
 # ArcFace-метрика сходства лиц (гейт входа + ранжирование вариантов)
-insightface
+# Версия закреплена: на Ubuntu 26.04 с Python 3.14 pip ставит insightface 2.0,
+# а проект проверен на 1.0.1. На сервере пин стоял локальной правкой вне git.
+insightface==1.0.1
 onnxruntime
 opencv-python
 numpy

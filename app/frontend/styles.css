@@ -573,10 +573,12 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
   box-shadow:0 12px 34px rgba(0,0,0,.5); font-size:16px; line-height:1.4;
   animation:fade .3s ease; cursor:pointer;}
 
-/* Щадящий режим: если в системе отключены анимации, экраны не выезжают,
-   надпись ожидания не мигает, полоса загрузки не ползёт. */
+/* Щадящий режим: если в системе отключены анимации, экраны не выезжают и
+   надпись ожидания не мигает. Полосу загрузки НЕ трогаем: это индикатор хода
+   работы, а не украшение. Запрет её плавного заполнения (14.09.2026) сломал
+   экран генерации — на Windows с выключенными анимациями полоса мгновенно
+   прыгала на 92% и стояла там всю генерацию. */
 @media (prefers-reduced-motion: reduce){
   .screen,.notice,.qr-waiting{animation:none;}
-  .loading-bar-fill{transition:none !important;}
   .btn-primary,.btn-email,.loc,.outfit,.variants img,.brand-mark{transition:none;}
 }

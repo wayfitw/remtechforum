@@ -195,6 +195,20 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
 .topbar-logos img + img{
   border-left:1px solid rgba(255,255,255,.15);
 }
+/* iPad в портретной ориентации (744–834 px) и узкие окна: на внутренних
+   экранах в одну полосу не помещались название события, три логотипа и кнопка
+   «Контакты» — кнопка уезжала за правый край на 45–60 px (замер 15.09.2026).
+   Прячем город, как на телефоне, и ужимаем поля между логотипами. На
+   приветствии логотипов в полосе нет, там всё остаётся как было. */
+@media (max-width:900px){
+  .global-topbar.inner .tb-sub, .global-topbar.inner .tb-dot{ display:none; }
+  .global-topbar.inner .topbar-logos img{ padding:0 clamp(8px,1.4vw,12px); }
+}
+/* iPad mini в портрете (744 px): даже без города полоса съедала правое поле —
+   кнопка стояла в 5 px от края вместо 24. Ещё чуть сближаем логотипы. */
+@media (max-width:800px){
+  .global-topbar.inner .topbar-logos img{ padding:0 6px; height:40px; }
+}
 
 /* ═══════════════════════════════════════
    ГЛОБАЛЬНАЯ НИЖНЯЯ ПОЛОСА ПАРТНЁРОВ
@@ -612,6 +626,9 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
    со значком, а название при нехватке места обрезается многоточием. */
 @media (max-width:640px){
   .contacts-btn{ width:32px; padding:0; justify-content:center; gap:0; }
+  /* До 640 px логотипы в полосе скрыты, и на внутренних экранах кнопка
+     вставала сразу за названием, а не у правого края, как на приветствии. */
+  .global-topbar.inner .contacts-btn{ margin-left:auto; }
   .contacts-btn span{ display:none; }
   .contacts-btn-ico{ width:14px; height:14px; }
   .global-topbar-title{ min-width:0; overflow:hidden; }
@@ -703,6 +720,22 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
 
 .contacts-foot{ margin:20px 0 0; color:#8d8d96; font-size:13px; line-height:1.4; text-align:center; }
 
+/* Телефон в горизонтальном положении и низкие окна: высоты 390 px не хватало,
+   внутри появлялась прокрутка и заголовок уезжал от центра на 8 px.
+   Та же сетка, только компактнее: QR по-прежнему равен трём строкам. */
+@media (max-height:520px) and (min-width:601px){
+  .contacts-card{ --row:56px; --row-gap:8px; --col-gap:20px; padding:16px 24px 14px; }
+  .contacts-head{ padding-bottom:10px; margin-bottom:12px; }
+  .contacts-eyebrow{ margin-bottom:5px; font-size:11px; }
+  .contacts-card h2{ font-size:22px; }
+  .contacts-close{ top:-4px; }
+  .contacts-qr-plate{ padding:9px; border-radius:14px; }
+  .contacts-ico{ width:34px; height:34px; border-radius:10px; }
+  .contacts-row{ grid-template-columns:34px minmax(0,1fr) 16px; gap:12px; border-radius:13px; }
+  .contacts-value{ font-size:17px; }
+  .contacts-foot{ margin-top:10px; font-size:12px; }
+}
+
 @media (max-width:600px){
   .contacts-card{ --row:68px; --qr:200px; padding:24px 20px 22px; }
   .contacts-card h2{ font-size:26px; }
@@ -711,3 +744,18 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
   .contacts-value{ font-size:17px; }
   .contacts-foot{ text-align:center; }
 }
+/* Невысокий телефон (390x664 и ниже): окно прокручивалось внутри. Та же
+   вертикальная раскладка, только компактнее. */
+@media (max-width:600px) and (max-height:760px){
+  .contacts-card{ --row:58px; --row-gap:8px; --qr:150px; padding:18px 18px 16px; }
+  .contacts-head{ padding-bottom:12px; margin-bottom:14px; }
+  .contacts-eyebrow{ margin-bottom:5px; font-size:11px; }
+  .contacts-card h2{ font-size:23px; }
+  .contacts-body{ gap:12px; }
+  .contacts-qr-plate{ padding:9px; border-radius:14px; }
+  .contacts-ico{ width:34px; height:34px; border-radius:10px; }
+  .contacts-row{ grid-template-columns:34px minmax(0,1fr) 16px; gap:12px; }
+  .contacts-value{ font-size:16px; }
+  .contacts-foot{ margin-top:12px; font-size:12px; }
+}
+

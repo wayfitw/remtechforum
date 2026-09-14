@@ -20,6 +20,7 @@ const screens = document.querySelectorAll('.screen');
 
 // ─── Навигация ────────────────────────────────────────────────
 function show(name) {
+  closeContacts();                 // смена экрана закрывает окно контактов
   screens.forEach(s => s.classList.toggle('active', s.dataset.screen === name));
   updateTopbar(name);
   resetIdle();
@@ -422,6 +423,25 @@ document.getElementById('qr-upload-btn').addEventListener('click', async () => {
 });
 
 document.getElementById('notice').addEventListener('click', e => e.currentTarget.classList.add('hidden'));
+
+// ─── Контакты ─────────────────────────────────────────────────
+// Окно поверх любого экрана. Закрывается крестиком, касанием мимо карточки,
+// клавишей Esc и сменой экрана — в том числе сбросом киоска по бездействию.
+function openContacts() {
+  const m = document.getElementById('contacts');
+  if (!m) return;
+  m.classList.remove('hidden');
+  document.getElementById('contacts-close')?.focus({ preventScroll: true });
+}
+function closeContacts() {
+  document.getElementById('contacts')?.classList.add('hidden');
+}
+document.getElementById('contacts-btn').addEventListener('click', openContacts);
+document.getElementById('contacts-close').addEventListener('click', closeContacts);
+document.getElementById('contacts').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeContacts();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeContacts(); });
 
 document.getElementById('qr-cancel').addEventListener('click', () => {
   stopQrPoller();

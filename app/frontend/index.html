@@ -34,6 +34,10 @@
          data-go="welcome" role="button" tabindex="0" title="На главную">
     <span class="global-topbar-title" id="topbar-title"><span class="tb-main">ExpoDrev Russia 26</span><span class="tb-dot"></span><span class="tb-sub">Красноярск</span></span>
     <div class="topbar-logos" id="topbar-logos"></div>
+    <button class="contacts-btn" id="contacts-btn" type="button" aria-haspopup="dialog" aria-label="Контакты">
+      <svg class="contacts-btn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 3.6 2.9 10.7c-1.2.5-1.2 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.1-14.6c.3-1.3-.5-1.9-1.5-1.5Z" fill="currentColor"/></svg>
+      <span>Контакты</span>
+    </button>
   </div>
 
   <!-- ═══ ГЛОБАЛЬНАЯ НИЖНЯЯ ПОЛОСА ПАРТНЁРОВ ═══ -->
@@ -162,6 +166,31 @@
 
   <!-- Сообщение гостю поверх любого экрана (вместо системного alert) -->
   <div id="notice" class="notice hidden" role="alert"></div>
+
+  <!-- Контакты: окно поверх любого экрана -->
+  <div id="contacts" class="contacts-modal hidden" role="dialog" aria-modal="true" aria-labelledby="contacts-title">
+    <div class="contacts-card">
+      <button class="contacts-close" id="contacts-close" type="button" aria-label="Закрыть">×</button>
+      <p class="contacts-eyebrow">«Ремтехника»</p>
+      <h2 id="contacts-title">Контакты</h2>
+      <div class="contacts-body">
+        <div class="contacts-qr-wrap">
+          <img class="contacts-qr" src="contacts-tg-qr.png?v=__V__" alt="QR-код: Telegram @dima_garnov">
+          <p class="contacts-qr-hint">Наведите камеру телефона — откроется Telegram</p>
+        </div>
+        <div class="contacts-list">
+          <a class="contacts-row" href="https://t.me/dima_garnov" target="_blank" rel="noopener">
+            <span class="contacts-label">Telegram</span>
+            <span class="contacts-value">@dima_garnov</span>
+          </a>
+          <a class="contacts-row" href="tel:+79140875484">
+            <span class="contacts-label">Телефон</span>
+            <span class="contacts-value">+7 914 087-54-84</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div>
 <script src="app.js?v=__V__"></script>

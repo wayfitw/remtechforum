@@ -579,6 +579,97 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
    экран генерации — на Windows с выключенными анимациями полоса мгновенно
    прыгала на 92% и стояла там всю генерацию. */
 @media (prefers-reduced-motion: reduce){
-  .screen,.notice,.qr-waiting{animation:none;}
+  .screen,.notice,.qr-waiting,.contacts-card{animation:none;}
   .btn-primary,.btn-email,.loc,.outfit,.variants img,.brand-mark{transition:none;}
+}
+
+/* ═══════════════════════════════════════
+   КОНТАКТЫ: кнопка в топбаре и окно
+═══════════════════════════════════════ */
+/* Кнопка стоит справа на всех экранах. На приветствии логотипов в полосе нет,
+   поэтому её прижимает к краю собственный auto-отступ; на внутренних экранах
+   это место занимают логотипы, и кнопка встаёт сразу за ними. */
+.contacts-btn{
+  margin-left:auto; flex:0 0 auto; pointer-events:auto; cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px;
+  min-height:40px; padding:0 clamp(12px,1.3vw,18px);
+  background:rgba(13,13,15,.55); color:var(--rt-yellow);
+  border:1.5px solid rgba(255,194,14,.55); border-radius:999px;
+  font:inherit; font-size:clamp(13px,1vw,15px); font-weight:700; letter-spacing:.04em;
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  transition:transform .12s, background .2s, border-color .2s;
+}
+.global-topbar.inner .contacts-btn{ margin-left:clamp(8px,1.2vw,18px); }
+.contacts-btn:active{ transform:scale(.95); }
+@media (hover:hover){ .contacts-btn:hover{ background:rgba(255,194,14,.12); border-color:var(--rt-yellow); } }
+.contacts-btn:focus-visible{ outline:2px solid var(--rt-yellow); outline-offset:3px; }
+.contacts-btn-ico{ width:17px; height:17px; flex:none; }
+/* На узком экране надпись не помещается рядом с названием события: кнопка
+   уезжала за правый край (замер 375 px — на 19 px). Оставляем круглую кнопку
+   со значком, а название при нехватке места обрезается многоточием. */
+@media (max-width:640px){
+  .contacts-btn{ width:38px; min-height:38px; padding:0; justify-content:center; gap:0; }
+  .contacts-btn span{ display:none; }
+  .contacts-btn-ico{ width:17px; height:17px; }
+  .global-topbar-title{ min-width:0; overflow:hidden; }
+  .tb-main{ overflow:hidden; text-overflow:ellipsis; }
+}
+
+.contacts-modal{
+  position:fixed; inset:0; z-index:60;
+  display:flex; align-items:center; justify-content:center;
+  padding:max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  background:rgba(8,8,10,.74);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+}
+.contacts-modal.hidden{ display:none; }
+.contacts-card{
+  position:relative; width:100%; max-width:600px; max-height:100%; overflow-y:auto;
+  background:linear-gradient(180deg,#1b1b20,#131316);
+  border:1px solid rgba(255,194,14,.35); border-radius:22px;
+  padding:clamp(22px,3vh,34px) clamp(20px,3vw,36px);
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+  text-align:left; animation:fade .3s ease;
+}
+.contacts-close{
+  position:absolute; top:10px; right:10px; width:44px; height:44px;
+  display:grid; place-items:center; cursor:pointer;
+  background:transparent; color:#a2a2ab; border:none; border-radius:12px;
+  font-size:30px; line-height:1;
+}
+.contacts-close:active{ transform:scale(.92); }
+.contacts-close:focus-visible{ outline:2px solid var(--rt-yellow); outline-offset:2px; }
+.contacts-eyebrow{
+  margin:0; color:var(--rt-yellow); font-size:12px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase;
+}
+.contacts-card h2{ margin:4px 0 clamp(16px,2.4vh,24px); font-size:clamp(26px,3.4vh,34px); color:#fff; }
+.contacts-body{
+  display:grid; grid-template-columns:auto 1fr; gap:clamp(18px,2.4vw,28px); align-items:center;
+}
+.contacts-qr-wrap{ display:flex; flex-direction:column; align-items:center; gap:10px; }
+.contacts-qr{
+  display:block; width:clamp(150px,24vh,210px); height:auto;
+  background:#fff; padding:10px; border-radius:16px;
+}
+.contacts-qr-hint{ margin:0; max-width:210px; text-align:center; color:#9a9aa3; font-size:13px; line-height:1.35; }
+.contacts-list{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+.contacts-row{
+  display:flex; flex-direction:column; gap:2px;
+  padding:12px 16px; border-radius:14px; text-decoration:none;
+  background:#202026; border:1.5px solid #2e2e35;
+  transition:border-color .15s, transform .1s;
+}
+.contacts-row:active{ transform:scale(.98); }
+@media (hover:hover){ .contacts-row:hover{ border-color:var(--rt-yellow); } }
+.contacts-row:focus-visible{ outline:2px solid var(--rt-yellow); outline-offset:2px; }
+.contacts-label{ color:#8d8d96; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+.contacts-value{
+  color:#fff; font-size:clamp(18px,2.4vh,22px); font-weight:700;
+  font-variant-numeric:tabular-nums; overflow-wrap:anywhere;
+}
+@media (max-width:560px){
+  .contacts-body{ grid-template-columns:1fr; }
+  .contacts-card{ text-align:center; }
+  .contacts-row{ align-items:center; }
 }

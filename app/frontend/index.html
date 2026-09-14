@@ -170,32 +170,42 @@
   <!-- Контакты: окно поверх любого экрана -->
   <div id="contacts" class="contacts-modal hidden" role="dialog" aria-modal="true" aria-labelledby="contacts-title">
     <div class="contacts-card">
-      <button class="contacts-close" id="contacts-close" type="button" aria-label="Закрыть">×</button>
-      <p class="contacts-eyebrow">«Ремтехника»</p>
-      <h2 id="contacts-title">Контакты</h2>
+      <div class="contacts-head">
+        <div>
+          <p class="contacts-eyebrow">«Ремтехника»</p>
+          <h2 id="contacts-title">Контакты</h2>
+        </div>
+        <button class="contacts-close" id="contacts-close" type="button" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
+        </button>
+      </div>
+
       <div class="contacts-body">
-        <div class="contacts-qr-wrap">
+        <div class="contacts-qr-plate">
           <img class="contacts-qr" src="contacts-channel-qr.png?v=__V__" alt="QR-код: Telegram-канал «Ремтехники» @rem_technika24">
-          <p class="contacts-qr-hint">Наведите камеру телефона — откроется наш Telegram-канал</p>
         </div>
         <div class="contacts-list">
           <a class="contacts-row" href="https://t.me/rem_technika24" target="_blank" rel="noopener">
-            <span class="contacts-label">Telegram-канал</span>
-            <span class="contacts-value">@rem_technika24</span>
+            <span class="contacts-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 3.6 2.9 10.7c-1.2.5-1.2 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.1-14.6c.3-1.3-.5-1.9-1.5-1.5Z" fill="currentColor"/></svg></span>
+            <span class="contacts-text"><span class="contacts-label">Telegram-канал</span><span class="contacts-value">@rem_technika24</span></span>
+            <svg class="contacts-go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </a>
           <a class="contacts-row" href="https://t.me/dima_garnov" target="_blank" rel="noopener">
-            <span class="contacts-label">Написать в Telegram</span>
-            <span class="contacts-value">@dima_garnov</span>
+            <span class="contacts-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.6" fill="currentColor"/><path d="M4.8 20c.6-3.8 3.6-6.2 7.2-6.2s6.6 2.4 7.2 6.2" fill="currentColor"/></svg></span>
+            <span class="contacts-text"><span class="contacts-label">Написать в Telegram</span><span class="contacts-value">@dima_garnov</span></span>
+            <svg class="contacts-go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </a>
           <a class="contacts-row" href="tel:+79140875484">
-            <span class="contacts-label">Телефон</span>
-            <span class="contacts-value">+7 914 087-54-84</span>
+            <span class="contacts-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5h2.6l1.4 4.2-1.9 1.3a11.6 11.6 0 0 0 6.3 6.3l1.3-1.9 4.2 1.4v2.6c0 1.1-.9 2-2 2A16.5 16.5 0 0 1 4.6 5.5c0-1.1.9-2 2-2Z" fill="currentColor"/></svg></span>
+            <span class="contacts-text"><span class="contacts-label">Телефон</span><span class="contacts-value">+7 914 087-54-84</span></span>
+            <svg class="contacts-go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </a>
         </div>
       </div>
+
+      <p class="contacts-foot">Наведите камеру телефона на QR-код — откроется Telegram-канал «Ремтехники»</p>
     </div>
   </div>
-
 </div>
 <script src="app.js?v=__V__"></script>
 </body>

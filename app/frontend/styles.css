@@ -626,53 +626,86 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
   backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
 }
 .contacts-modal.hidden{ display:none; }
+
+/* Сетка окна. Высота QR-кода равна высоте трёх строк контактов, поэтому верх и
+   низ обеих колонок стоят на одной линии, а заголовок, QR-код и подсказка
+   начинаются от одного левого края (замечание заказчика 15.09.2026). */
 .contacts-card{
-  position:relative; width:100%; max-width:600px; max-height:100%; overflow-y:auto;
-  background:linear-gradient(180deg,#1b1b20,#131316);
-  border:1px solid rgba(255,194,14,.35); border-radius:22px;
-  padding:clamp(22px,3vh,34px) clamp(20px,3vw,36px);
-  box-shadow:0 24px 60px rgba(0,0,0,.6);
+  --row:76px; --row-gap:12px; --col-gap:24px;
+  --qr:calc(var(--row) * 3 + var(--row-gap) * 2);
+  position:relative; width:100%; max-width:640px; max-height:100%; overflow-y:auto;
+  box-sizing:border-box;
+  background:linear-gradient(180deg,#1b1b20 0%,#141417 100%);
+  border:1px solid rgba(255,194,14,.28); border-radius:24px;
+  padding:28px 32px 26px;
+  box-shadow:0 30px 70px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
   text-align:left; animation:fade .3s ease;
 }
-.contacts-close{
-  position:absolute; top:10px; right:10px; width:44px; height:44px;
-  display:grid; place-items:center; cursor:pointer;
-  background:transparent; color:#a2a2ab; border:none; border-radius:12px;
-  font-size:30px; line-height:1;
+
+.contacts-head{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+  padding-bottom:20px; margin-bottom:22px;
+  border-bottom:1px solid rgba(255,255,255,.08);
 }
+.contacts-eyebrow{
+  margin:0 0 8px; color:var(--rt-yellow); font-size:12px; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase; line-height:1;
+}
+.contacts-card h2{ margin:0; font-size:30px; line-height:1.1; color:#fff; letter-spacing:-.01em; }
+.contacts-close{
+  width:40px; height:40px; flex:none; margin:-6px -10px 0 0;
+  display:grid; place-items:center; cursor:pointer;
+  background:transparent; color:#8d8d96; border:none; border-radius:12px;
+  transition:background .15s, color .15s;
+}
+.contacts-close svg{ width:20px; height:20px; }
+@media (hover:hover){ .contacts-close:hover{ background:rgba(255,255,255,.06); color:#fff; } }
 .contacts-close:active{ transform:scale(.92); }
 .contacts-close:focus-visible{ outline:2px solid var(--rt-yellow); outline-offset:2px; }
-.contacts-eyebrow{
-  margin:0; color:var(--rt-yellow); font-size:12px; font-weight:700;
-  letter-spacing:.16em; text-transform:uppercase;
-}
-.contacts-card h2{ margin:4px 0 clamp(16px,2.4vh,24px); font-size:clamp(26px,3.4vh,34px); color:#fff; }
+
 .contacts-body{
-  display:grid; grid-template-columns:auto 1fr; gap:clamp(18px,2.4vw,28px); align-items:center;
+  display:grid; grid-template-columns:var(--qr) minmax(0,1fr); gap:var(--col-gap); align-items:start;
 }
-.contacts-qr-wrap{ display:flex; flex-direction:column; align-items:center; gap:10px; }
-.contacts-qr{
-  display:block; width:clamp(150px,24vh,210px); height:auto;
-  background:#fff; padding:10px; border-radius:16px;
+.contacts-qr-plate{
+  width:var(--qr); height:var(--qr); box-sizing:border-box;
+  padding:14px; border-radius:18px; background:#fff;
 }
-.contacts-qr-hint{ margin:0; max-width:210px; text-align:center; color:#9a9aa3; font-size:13px; line-height:1.35; }
-.contacts-list{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+.contacts-qr{ display:block; width:100%; height:100%; image-rendering:pixelated; }
+
+.contacts-list{ display:flex; flex-direction:column; gap:var(--row-gap); min-width:0; }
 .contacts-row{
-  display:flex; flex-direction:column; gap:2px;
-  padding:12px 16px; border-radius:14px; text-decoration:none;
-  background:#202026; border:1.5px solid #2e2e35;
-  transition:border-color .15s, transform .1s;
+  height:var(--row); box-sizing:border-box;
+  display:grid; grid-template-columns:40px minmax(0,1fr) 18px; align-items:center; gap:14px;
+  padding:0 14px 0 16px; border-radius:16px; text-decoration:none;
+  background:#202026; border:1px solid #2c2c33;
+  transition:border-color .15s, background .15s, transform .1s;
 }
-.contacts-row:active{ transform:scale(.98); }
-@media (hover:hover){ .contacts-row:hover{ border-color:var(--rt-yellow); } }
+.contacts-row:active{ transform:scale(.985); }
+@media (hover:hover){ .contacts-row:hover{ border-color:rgba(255,194,14,.7); background:#24242a; } }
 .contacts-row:focus-visible{ outline:2px solid var(--rt-yellow); outline-offset:2px; }
-.contacts-label{ color:#8d8d96; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
-.contacts-value{
-  color:#fff; font-size:clamp(18px,2.4vh,22px); font-weight:700;
-  font-variant-numeric:tabular-nums; overflow-wrap:anywhere;
+.contacts-ico{
+  width:40px; height:40px; border-radius:12px; display:grid; place-items:center;
+  background:rgba(255,194,14,.12); color:var(--rt-yellow);
 }
-@media (max-width:560px){
-  .contacts-body{ grid-template-columns:1fr; }
-  .contacts-card{ text-align:center; }
-  .contacts-row{ align-items:center; }
+.contacts-ico svg{ width:20px; height:20px; }
+.contacts-text{ display:flex; flex-direction:column; gap:5px; min-width:0; }
+.contacts-label{
+  color:#8d8d96; font-size:11px; font-weight:700; line-height:1;
+  letter-spacing:.14em; text-transform:uppercase;
+}
+.contacts-value{
+  color:#fff; font-size:19px; font-weight:700; line-height:1.15;
+  font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.contacts-go{ width:18px; height:18px; color:#5f5f68; }
+
+.contacts-foot{ margin:20px 0 0; color:#8d8d96; font-size:13px; line-height:1.4; }
+
+@media (max-width:600px){
+  .contacts-card{ --row:68px; --qr:200px; padding:24px 20px 22px; }
+  .contacts-card h2{ font-size:26px; }
+  .contacts-body{ grid-template-columns:minmax(0,1fr); justify-items:center; gap:18px; }
+  .contacts-list{ width:100%; }
+  .contacts-value{ font-size:17px; }
+  .contacts-foot{ text-align:center; }
 }

@@ -643,8 +643,10 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
 }
 
 .contacts-head{
-  display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
-  padding-bottom:20px; margin-bottom:22px;
+  /* Подпись и заголовок по центру окна; крестик вынесен в угол абсолютно,
+     а боковые поля шапки не дают длинному заголовку зайти под него. */
+  position:relative; text-align:center;
+  padding:0 48px 20px; margin-bottom:22px;
   border-bottom:1px solid rgba(255,255,255,.08);
 }
 .contacts-eyebrow{
@@ -653,7 +655,7 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
 }
 .contacts-card h2{ margin:0; font-size:30px; line-height:1.1; color:#fff; letter-spacing:-.01em; }
 .contacts-close{
-  width:40px; height:40px; flex:none; margin:-6px -10px 0 0;
+  position:absolute; top:-6px; right:-10px; width:40px; height:40px;
   display:grid; place-items:center; cursor:pointer;
   background:transparent; color:#8d8d96; border:none; border-radius:12px;
   transition:background .15s, color .15s;
@@ -699,7 +701,7 @@ h2{font-size:min(6vw,4.6vh,40px); color:#fff; margin:.2em 0;}
 }
 .contacts-go{ width:18px; height:18px; color:#5f5f68; }
 
-.contacts-foot{ margin:20px 0 0; color:#8d8d96; font-size:13px; line-height:1.4; }
+.contacts-foot{ margin:20px 0 0; color:#8d8d96; font-size:13px; line-height:1.4; text-align:center; }
 
 @media (max-width:600px){
   .contacts-card{ --row:68px; --qr:200px; padding:24px 20px 22px; }

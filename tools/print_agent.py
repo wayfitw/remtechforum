@@ -321,7 +321,15 @@ def self_check(printer: str) -> None:
         problem = sheet_problem(pw, ph, dx, dy)
         log(f"ВНИМАНИЕ: {problem}" if problem else
             "лист 4x6 подходит: карточка ляжет по центру ровно 10x15 см, запас под обрез останется белым")
-    fetch_jobs()
+    # Нет сети на старте — не повод падать: раньше exe закрывался с ошибкой, и
+    # оператор видел только мигнувшее окно. Основной цикл сам дождётся связи.
+    try:
+        fetch_jobs()
+    except SystemExit:
+        raise
+    except Exception as exc:                        # noqa: BLE001
+        log(f"сеть пока недоступна ({type(exc).__name__}), жду связи и карточки…")
+        return
     log("связь с сервером и ключ в порядке, жду карточки…")
 
 
@@ -358,4 +366,9 @@ if __name__ == "__main__":
         log(str(exc))
         if getattr(sys, "frozen", False):
             input("Нажмите Enter, чтобы закрыть окно…")
+        sys.exit(1)
+    except Exception as exc:                        # noqa: BLE001
+        log(f"программа остановилась из-за ошибки: {type(exc).__name__}: {exc}")
+        if getattr(sys, "frozen", False):
+            input("Пришлите agent.log. Нажмите Enter, чтобы закрыть окно…")
         sys.exit(1)

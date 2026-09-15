@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import io
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 # opencv нужен для выравнивания света (deshadow). Детектор Хаара — отдельно:
 # в OpenCV 5 класса CascadeClassifier и xml-файлов каскадов больше нет, и раньше
@@ -32,21 +32,32 @@ if cv2 is not None and hasattr(cv2, "CascadeClassifier"):
         _CASCADE = None
 
 
+def _all_faces(img: Image.Image):
+    """(рамка гостя, [рамки остальных лиц]) в виде (x1, y1, x2, y2), либо (None, []).
+    Гость — самое крупное лицо, как и в гейте."""
+    try:
+        import face_metric  # ленивый импорт: модуль тяжёлый и тянет config
+        buf = io.BytesIO(); img.save(buf, format="JPEG", quality=95)
+        faces = face_metric._faces(buf.getvalue())
+        if faces:
+            guest = face_metric._largest(faces)
+            others = [tuple(float(v) for v in f.bbox) for f in faces if f is not guest]
+            return tuple(float(v) for v in guest.bbox), others
+    except Exception as exc:  # noqa: BLE001
+        print(f"[facecrop] insightface недоступен: {exc}")
+    return None, []
+
+
 def _face_box(img: Image.Image):
     """Рамка самого крупного лица (x, y, w, h) или None.
 
     Основной детектор — insightface: он уже загружен для входного контроля и
     работает на любой версии OpenCV. Хаар — только запасной, если insightface
     недоступен."""
-    try:
-        import face_metric  # ленивый импорт: модуль тяжёлый и тянет config
-        buf = io.BytesIO(); img.save(buf, format="JPEG", quality=95)
-        face = face_metric._largest(face_metric._faces(buf.getvalue()))
-        if face is not None:
-            x1, y1, x2, y2 = (float(v) for v in face.bbox)
-            return x1, y1, x2 - x1, y2 - y1
-    except Exception as exc:  # noqa: BLE001
-        print(f"[facecrop] insightface недоступен: {exc}")
+    guest, _ = _all_faces(img)
+    if guest is not None:
+        x1, y1, x2, y2 = guest
+        return x1, y1, x2 - x1, y2 - y1
     if _CASCADE is not None:
         W, H = img.size
         gray = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
@@ -57,23 +68,129 @@ def _face_box(img: Image.Image):
     return None
 
 
-def deshadow(image_bytes: bytes, clip: float = 2.0) -> bytes | None:
-    """Выравнивает освещение кадра с вебки: поднимает тени, гасит пересветы
-    (CLAHE по каналу яркости L). Черты лица НЕ меняются — правится только свет,
-    поэтому сходство сохраняется, и ничего не «замыливается»."""
+DESHADOW_DARK_FACE = 95      # средняя яркость лица (L, 0–255), ниже — лицо тёмное
+DESHADOW_SIDE_DIFF = 22      # разница яркости левой и правой половины лица — боковая тень
+DESHADOW_STRENGTH = 0.6      # доля CLAHE в итоге: полная сила давала «пережаренный» кадр
+
+
+def deshadow(image_bytes: bytes, clip: float = 2.0, bbox=None) -> bytes | None:
+    """Выравнивает освещение кадра с вебки: поднимает тени (CLAHE по яркости L).
+    Черты лица НЕ меняются — правится только свет.
+
+    Работает, только если на лице есть что исправлять: лицо тёмное или одна
+    половина заметно темнее другой. Без этой проверки CLAHE шёл по каждому
+    кадру и на нормальном свете только добавлял зерно и жёсткий контраст
+    (прогон 16.09.2026). None — кадр оставлен как есть."""
     if cv2 is None:
         return None
     try:
         img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
         lab = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2LAB)
         l, a, b = cv2.split(lab)
-        l = cv2.createCLAHE(clipLimit=clip, tileGridSize=(8, 8)).apply(l)
+        if bbox:
+            # Мерим по щекам и средней части лица: края рамки захватывают волосы,
+            # и прядь с одной стороны давала ложный «перепад света».
+            x1, y1, x2, y2 = (float(v) for v in bbox)
+            fw, fh = x2 - x1, y2 - y1
+            face = l[max(0, int(y1 + fh * 0.35)):max(0, int(y1 + fh * 0.80)),
+                     max(0, int(x1 + fw * 0.15)):max(0, int(x2 - fw * 0.15))]
+            if face.size:
+                mid = face.shape[1] // 2
+                mean = float(face.mean())
+                side = abs(float(face[:, :mid].mean()) - float(face[:, mid:].mean()))
+                if mean >= DESHADOW_DARK_FACE and side < DESHADOW_SIDE_DIFF:
+                    print(f"[deshadow] пропущен — свет на лице ровный (яркость {mean:.0f}, перепад {side:.0f})")
+                    return None
+        eq = cv2.createCLAHE(clipLimit=clip, tileGridSize=(8, 8)).apply(l)
+        l = cv2.addWeighted(eq, DESHADOW_STRENGTH, l, 1 - DESHADOW_STRENGTH, 0)
         out = cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2RGB)
         buf = io.BytesIO(); Image.fromarray(out).save(buf, format="PNG")
         return buf.getvalue()
     except Exception as exc:  # noqa: BLE001
         print(f"[deshadow] failed: {exc}")
         return None
+
+
+def paste_face(base_bytes: bytes, enhanced_bytes: bytes, bbox) -> bytes | None:
+    """Вклеивает лицо из результата GFPGAN в исходный кадр того же размера.
+
+    GFPGAN возвращает кадр в 2 раза крупнее, а фон при этом перерисовывает
+    апскейлером: он «мылится» и выглядит нарисованным. Нужна только его работа
+    над лицом, поэтому результат уменьшается до размера исходника и
+    переносится мягкой овальной маской вокруг лица. None — не получилось."""
+    if not bbox or not enhanced_bytes:
+        return None
+    try:
+        base = ImageOps.exif_transpose(Image.open(io.BytesIO(base_bytes))).convert("RGB")
+        enh = Image.open(io.BytesIO(enhanced_bytes)).convert("RGB").resize(base.size, Image.LANCZOS)
+        x1, y1, x2, y2 = (float(v) for v in bbox)
+        fw, fh = x2 - x1, y2 - y1
+        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+        mask = Image.new("L", base.size, 0)
+        ImageDraw.Draw(mask).ellipse([cx - fw * 0.72, cy - fh * 0.78, cx + fw * 0.72, cy + fh * 0.68], fill=255)
+        mask = mask.filter(ImageFilter.GaussianBlur(max(4, fw * 0.1)))
+        out = base.copy()
+        out.paste(enh, (0, 0), mask)
+        buf = io.BytesIO(); out.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[facecrop] не удалось вклеить лицо GFPGAN: {exc}")
+        return None
+
+
+def hide_others(img: Image.Image, guest, others) -> Image.Image:
+    """Стирает посторонних людей с фото гостя перед вырезками для модели.
+
+    Зачем (прогон 16.09.2026 на кадрах с людьми за спиной): гейт и кроп под
+    свап выбирали гостя верно, но вырезка «корпус по пояс» шириной 4 лица
+    захватывала соседа — его лицо, волосы, плечо. Модель видит их на эталоне
+    гостя и может дорисовать в сцену второго человека.
+
+    Голова и корпус каждого постороннего заливаются окружающим фоном (inpaint),
+    голова и плечи гостя закрыты защитной маской и не трогаются. Работает на
+    уменьшенной копии — заливке нужна только грубая форма."""
+    if not others or cv2 is None or np is None or guest is None:
+        return img
+    try:
+        W, H = img.size
+        k = min(1.0, 900 / max(W, H))
+        sw, sh = max(1, int(W * k)), max(1, int(H * k))
+
+        mask = Image.new("L", (sw, sh), 0)
+        d = ImageDraw.Draw(mask)
+        for ox1, oy1, ox2, oy2 in others:
+            ow, oh = ox2 - ox1, oy2 - oy1
+            ocx = (ox1 + ox2) / 2
+            d.ellipse([(ox1 - ow * 0.5) * k, (oy1 - oh * 0.6) * k,
+                       (ox2 + ow * 0.5) * k, (oy2 + oh * 0.35) * k], fill=255)       # голова и волосы
+            d.rectangle([(ocx - ow * 1.5) * k, (oy2 - oh * 0.1) * k,
+                         (ocx + ow * 1.5) * k, sh], fill=255)                         # плечи и корпус
+
+        gx1, gy1, gx2, gy2 = guest
+        gw, gh = gx2 - gx1, gy2 - gy1
+        gcx = (gx1 + gx2) / 2
+        protect = Image.new("L", (sw, sh), 0)
+        p = ImageDraw.Draw(protect)
+        p.ellipse([(gx1 - gw * 0.35) * k, (gy1 - gh * 0.5) * k,
+                   (gx2 + gw * 0.35) * k, (gy2 + gh * 0.25) * k], fill=255)
+        p.polygon([((gcx - gw * 0.6) * k, (gy2 - gh * 0.2) * k), ((gcx + gw * 0.6) * k, (gy2 - gh * 0.2) * k),
+                   ((gcx + gw * 2.0) * k, (gy2 + gh * 0.9) * k), ((gcx + gw * 2.0) * k, sh),
+                   ((gcx - gw * 2.0) * k, sh), ((gcx - gw * 2.0) * k, (gy2 + gh * 0.9) * k)], fill=255)
+
+        m = (np.array(mask) > 0) & (np.array(protect) == 0)
+        if not m.any():
+            return img
+        m8 = (m * 255).astype(np.uint8)
+        small = cv2.cvtColor(np.array(img.resize((sw, sh), Image.LANCZOS)), cv2.COLOR_RGB2BGR)
+        filled = cv2.inpaint(small, m8, 9, cv2.INPAINT_TELEA)
+        filled = Image.fromarray(cv2.cvtColor(filled, cv2.COLOR_BGR2RGB)).resize((W, H), Image.LANCZOS)
+        soft = Image.fromarray(m8).resize((W, H), Image.BILINEAR).filter(ImageFilter.GaussianBlur(max(2, 4 / k)))
+        out = img.copy()
+        out.paste(filled.filter(ImageFilter.GaussianBlur(max(1, 2 / k))), (0, 0), soft)
+        return out
+    except Exception as exc:  # noqa: BLE001
+        print(f"[facecrop] не удалось скрыть посторонних: {exc}")
+        return img
 
 
 def crop_for_swap(image_bytes: bytes, bbox, others=None) -> bytes | None:
@@ -135,7 +252,11 @@ def crops(image_bytes: bytes) -> tuple[bytes, bytes]:
     img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
     W, H = img.size
 
-    box = _face_box(img)
+    guest, others = _all_faces(img)
+    if guest is not None and others:
+        img = hide_others(img, guest, others)
+        print(f"[facecrop] посторонних на фото гостя: {len(others)}, скрыты перед вырезками")
+    box = (guest[0], guest[1], guest[2] - guest[0], guest[3] - guest[1]) if guest else _face_box(img)
     if box is not None:
         x, y, w, h = box
         cx, cy = x + w / 2, y + h / 2
@@ -156,7 +277,7 @@ def crops(image_bytes: bytes) -> tuple[bytes, bytes]:
         _s = _MIN_FACE / max(face_img.size)
         face_img = face_img.resize((int(face_img.width * _s), int(face_img.height * _s)), Image.LANCZOS)
 
-    body_png = crop_to_face(image_bytes)          # корпус по пояс (существующая логика)
+    body_png = _body_crop(img, box)               # корпус по пояс — с того же очищенного фото
     fbuf = io.BytesIO(); face_img.save(fbuf, format="PNG")
     return fbuf.getvalue(), body_png
 
@@ -164,9 +285,12 @@ def crops(image_bytes: bytes) -> tuple[bytes, bytes]:
 def crop_to_face(image_bytes: bytes) -> bytes:
     """Возвращает PNG с обрезкой до головы и плеч. Ориентация — вертикальная 3:4."""
     img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
-    W, H = img.size
+    return _body_crop(img, _face_box(img))
 
-    box = _face_box(img)
+
+def _body_crop(img: Image.Image, box) -> bytes:
+    """Вырезка «по пояс» вокруг рамки лица box (x, y, w, h); None — запасная область."""
+    W, H = img.size
     if box is not None:
         # самое крупное лицо
         x, y, w, h = box

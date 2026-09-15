@@ -254,10 +254,12 @@ def _generate_sync(loc: dict, guest_bytes: bytes, outfit: str):
             _save(guest_bytes, f"rej_{uuid.uuid4().hex[:6]}.jpg")
             raise HTTPException(422, reason)
 
-    # убираем тени с лица с вебки: выравниваем свет ДО кропов и генерации
-    # (правится только освещение, черты лица не меняются)
+    # Тени с лица с вебки выравниваем ДО кропов и генерации — но только когда они
+    # есть. Раньше CLAHE шёл по каждому кадру: усиливал местный контраст и шум,
+    # фон становился зернистым, лицо «пережаренным», и это лицо уходило в свап
+    # (замечание 16.09.2026: «блюр и засветка на фото с камеры»).
     if config.FACE_DESHADOW_ENABLED:
-        dz = facecrop.deshadow(guest_bytes, config.FACE_DESHADOW_CLIP)
+        dz = facecrop.deshadow(guest_bytes, config.FACE_DESHADOW_CLIP, (info or {}).get("bbox"))
         if dz:
             guest_bytes = dz
             print("[deshadow] свет на лице выровнен")
@@ -292,7 +294,10 @@ def _generate_sync(loc: dict, guest_bytes: bytes, outfit: str):
         if нужен:
             enhanced = replicate_client.enhance_face(guest_bytes)
             if enhanced:
-                guest_bytes = enhanced
+                # GFPGAN отдаёт кадр вдвое крупнее и перерисовывает ФОН апскейлером:
+                # фон «мылился», надписи и контуры плыли. Берём у него только лицо
+                # и вклеиваем в кадр исходного размера.
+                guest_bytes = facecrop.paste_face(guest_bytes, enhanced, (info or {}).get("bbox")) or enhanced
                 print(f"[enhance] GFPGAN применён (лицо {face_px}px, резкость {sharp})")
         else:
             print(f"[enhance] пропущен — фото и так хорошее "
@@ -399,6 +404,18 @@ def _generate_sync(loc: dict, guest_bytes: bytes, outfit: str):
             print(f"[frame] доли лица: {[round(r, 3) if r else None for r in ratios]} → "
                   f"полный рост отбракован, оставлено {len(good)}")
             variants = [variants[i] for i in good]
+
+    # отбраковка кадров, где модель дорисовала второго человека (сосед гостя в
+    # кадре, толпа за спиной). Как и выше — только если остаётся чистый вариант.
+    if config.EXTRA_PEOPLE_CHECK and variants:
+        extra = [face_metric.extra_people(v) for v in variants]
+        if any(extra):
+            clean = [i for i, n in enumerate(extra) if n == 0]
+            if clean and len(clean) < len(variants):
+                variants = [variants[i] for i in clean]
+                print(f"[people] лишние люди в вариантах {extra} → оставлено {len(variants)}")
+            else:
+                print(f"[people] ВНИМАНИЕ: лишние люди во всех вариантах {extra}, заменить нечем")
 
     # ранжирование по сходству с гостем (ArcFace): лучший кадр — первым; слабые
     # (ниже порога) отбраковываются, но хотя бы один вариант всегда остаётся.

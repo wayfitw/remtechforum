@@ -90,6 +90,20 @@ def frame_ratio(image_bytes: bytes) -> Optional[float]:
         return None
 
 
+def extra_people(image_bytes: bytes) -> int:
+    """Сколько в готовом кадре ЛИШНИХ людей рядом с гостем.
+
+    Считаются лица с уверенностью детектора не ниже EXTRA_FACE_MIN_SCORE и
+    размером не меньше EXTRA_FACE_MIN_RATIO от самого крупного. Порог по
+    уверенности отсекает морду медведя: на прогоне 16.09.2026 она давала
+    «лицо» с оценкой 0.54, а человеческие лица в кадрах — 0.86–0.91."""
+    faces = [f for f in _faces(image_bytes) if float(f.det_score) >= config.EXTRA_FACE_MIN_SCORE]
+    if len(faces) < 2:
+        return 0
+    big = max(f.bbox[2] - f.bbox[0] for f in faces)
+    return sum(1 for f in faces if (f.bbox[2] - f.bbox[0]) >= big * config.EXTRA_FACE_MIN_RATIO) - 1
+
+
 def similarity(emb_a: Optional[np.ndarray], emb_b: Optional[np.ndarray]) -> float:
     """Косинусное сходство (оба эмбеддинга нормированы) в диапазоне ~[-1..1]."""
     if emb_a is None or emb_b is None:

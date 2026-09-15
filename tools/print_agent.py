@@ -4,11 +4,12 @@
 «Отправить в печать», карточка встаёт в очередь на сервере, а этот агент на
 ноутбуке у принтера забирает её по HTTPS и печатает на месте.
 
-Печать идёт напрямую через Windows (GDI), без программы просмотра картинок:
-изображение ложится ровно на лист, выбранный в драйвере. Карточка с сервера
-1200x1800 — это 4x6" при 300 dpi, родной размер DNP QW410. Если в драйвере
-выбран другой размер бумаги, агент не печатает и пишет, что исправить, — так
-рулон не уходит впустую.
+Печать идёт напрямую через Windows (GDI), без программы просмотра картинок.
+Карточка с сервера 1200x1800 — это 4x6" при 300 dpi, родной размер DNP QW410;
+она ложится ровно 10x15 см по центру листа. Драйвер DNP отдаёт лист 4x6 с
+запасом под обрез (у DP-QW410 — 107x155 мм), этот запас остаётся белым. Если в
+драйвере выбран другой размер бумаги, агент не печатает и пишет, что исправить, —
+так рулон не уходит впустую.
 
 Настройка — файл settings.txt рядом с программой (строки КЛЮЧ=ЗНАЧЕНИЕ) или
 переменные окружения с теми же именами:
@@ -64,7 +65,13 @@ DRY_RUN = CFG.get("DRY_RUN", "") in ("1", "true", "yes")
 
 DOWNLOADS = HERE / "printed"
 LOGFILE = HERE / "agent.log"
-TOLERANCE = 0.03          # допустимое расхождение пропорций карточки и листа
+# Какие листы считаем бумагой 4x6. Драйвер DNP отдаёт лист с запасом под обрез:
+# у DP-QW410 (драйвер 1.0.1.1) при размере 4x6 это 107x155 мм, а не ровно
+# 101.6x152.4 — принтер печатает чуть за край, чтобы не было белой кромки.
+# Прежняя проверка «пропорции ±3%» такой лист браковала (15.09.2026, стенд).
+SHEET_SHORT_MM = (98, 112)
+SHEET_LONG_MM = (148, 160)
+CARD_INCHES = (4, 6)      # физический размер карточки: 1200x1800 при 300 dpi
 
 # Коды GetDeviceCaps
 LOGPIXELSX, LOGPIXELSY = 88, 90
@@ -128,17 +135,30 @@ def _caps(printer: str, *codes: int) -> list[int]:
         dc.DeleteDC()
 
 
-def paper_problem(printer: str, size: tuple[int, int]) -> str | None:
-    """None — лист подходит под карточку; иначе текст, что исправить в драйвере."""
-    pw, ph, dx, dy = _caps(printer, PHYSICALWIDTH, PHYSICALHEIGHT, LOGPIXELSX, LOGPIXELSY)
-    iw, ih = size
-    if (iw > ih) != (pw > ph):
-        iw, ih = ih, iw                      # карточку повернём под ориентацию листа
-    if abs(pw / ph - iw / ih) / (iw / ih) > TOLERANCE:
-        mm_w, mm_h = round(pw / dx * 25.4), round(ph / dy * 25.4)
-        return (f"в драйвере выбран лист {mm_w}x{mm_h} мм, а карточка рассчитана на 10x15 см. "
-                f"Откройте «Настройки печати» принтера и выберите размер 4x6.")
-    return None
+def sheet_problem(pw: int, ph: int, dx: int, dy: int) -> str | None:
+    """None — лист 4x6 (ровный или с запасом под обрез); иначе текст, что исправить."""
+    mm_w, mm_h = pw / dx * 25.4, ph / dy * 25.4
+    short, long_ = sorted((mm_w, mm_h))
+    if SHEET_SHORT_MM[0] <= short <= SHEET_SHORT_MM[1] and SHEET_LONG_MM[0] <= long_ <= SHEET_LONG_MM[1]:
+        return None
+    return (f"в драйвере выбран лист {round(mm_w)}x{round(mm_h)} мм, а карточка рассчитана на 10x15 см. "
+            f"Откройте «Настройки печати» принтера и выберите размер 4x6.")
+
+
+def placement(pw: int, ph: int, dx: int, dy: int, ox: int, oy: int,
+              portrait: bool) -> tuple[int, int, int, int]:
+    """Прямоугольник вывода карточки в координатах устройства.
+
+    Карточка ложится ровно 4x6 дюйма по центру физического листа — без растяжения
+    и обрезки: запас драйвера под обрез остаётся белым, как и рамка карточки
+    (у неё ~55 px белого поля по краям). Если лист вдруг меньше 4x6, карточка
+    вписывается в него целиком с сохранением пропорций."""
+    cw_in, ch_in = CARD_INCHES if portrait else CARD_INCHES[::-1]
+    cw, ch = cw_in * dx, ch_in * dy
+    k = min(1.0, pw / cw, ph / ch)
+    cw, ch = round(cw * k), round(ch * k)
+    left, top = (pw - cw) // 2 - ox, (ph - ch) // 2 - oy
+    return left, top, left + cw, top + ch
 
 
 def print_windows(printer: str, path: Path, output_file: str | None = None) -> None:
@@ -148,12 +168,14 @@ def print_windows(printer: str, path: Path, output_file: str | None = None) -> N
     from PIL import ImageWin
 
     img = Image.open(path).convert("RGB")
-    problem = paper_problem(printer, img.size)
+    pw, ph, ox, oy, dx, dy = _caps(printer, PHYSICALWIDTH, PHYSICALHEIGHT, PHYSICALOFFSETX,
+                                   PHYSICALOFFSETY, LOGPIXELSX, LOGPIXELSY)
+    problem = sheet_problem(pw, ph, dx, dy)
     if problem:
         raise RuntimeError(problem)
-    pw, ph, ox, oy = _caps(printer, PHYSICALWIDTH, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY)
     if (img.width > img.height) != (pw > ph):
         img = img.rotate(90, expand=True)
+    rect = placement(pw, ph, dx, dy, ox, oy, portrait=img.height >= img.width)
 
     dc = win32ui.CreateDC()
     dc.CreatePrinterDC(printer)
@@ -163,9 +185,8 @@ def print_windows(printer: str, path: Path, output_file: str | None = None) -> N
         else:
             dc.StartDoc(path.name)
         dc.StartPage()
-        # Координаты устройства отсчитываются от печатной области; рисуем на весь
-        # физический лист, чтобы у сублимационного принтера не было белых полей.
-        ImageWin.Dib(img).draw(dc.GetHandleOutput(), (-ox, -oy, pw - ox, ph - oy))
+        # Координаты устройства отсчитываются от печатной области (см. placement).
+        ImageWin.Dib(img).draw(dc.GetHandleOutput(), rect)
         dc.EndPage()
         dc.EndDoc()
     finally:
@@ -297,8 +318,9 @@ def self_check(printer: str) -> None:
     else:
         pw, ph, dx, dy = _caps(printer, PHYSICALWIDTH, PHYSICALHEIGHT, LOGPIXELSX, LOGPIXELSY)
         log(f"принтер «{printer}» · лист {round(pw / dx * 25.4)}x{round(ph / dy * 25.4)} мм · {dx} dpi")
-        problem = paper_problem(printer, (1200, 1800))
-        log(f"ВНИМАНИЕ: {problem}" if problem else "размер бумаги подходит под карточку 10x15 см")
+        problem = sheet_problem(pw, ph, dx, dy)
+        log(f"ВНИМАНИЕ: {problem}" if problem else
+            "лист 4x6 подходит: карточка ляжет по центру ровно 10x15 см, запас под обрез останется белым")
     fetch_jobs()
     log("связь с сервером и ключ в порядке, жду карточки…")
 
